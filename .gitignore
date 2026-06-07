@@ -1,0 +1,26 @@
+.venv/
+.env
+venv/
+env/
+__pycache__/
+*.pyc
+instance/
+*.sqlite3
+.vscode/
+.env
+apps/*/migrations/*
+!apps/*/migrations/__init__.py
+pitahaya_samples*/
+apps/analysis/ai_models/pitahaya_vision.keras
+apps/chatbot/llm_models/
+*.bin
+*.safetensors
+llm_models/
+*.md
+media/
+# PostgreSQL
+.pgdata/
+pgdata/
+postgres_data/
+templates/account
+templates/emails
