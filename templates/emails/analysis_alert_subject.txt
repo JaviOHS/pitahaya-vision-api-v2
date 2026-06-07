@@ -1,1 +1,0 @@
-Alerta fitosanitaria: {{ analysis.disease_name }} · Pitahaya Vision

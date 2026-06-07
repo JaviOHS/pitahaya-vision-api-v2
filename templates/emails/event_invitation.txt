@@ -1,9 +1,0 @@
-Hola {{ invited_name }},
-
-Has sido invitado/a al evento "{{ event.title }}" ({{ event_type_display }}) programado para el {{ starts_at|date:'d/m/Y H:i' }}{% if event.location %} en {{ event.location }}{% endif %}.
-
-Revisa la invitación oficial y responde desde:
-{{ letter_url }}
-
-— Equipo Pitahaya Vision
-Correo automático · No responder

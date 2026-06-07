@@ -67,6 +67,15 @@ def _resolve_role_label(user):
     return 'Administrador' if (user.is_staff or user.is_superuser) else 'Usuario'
 
 
+def _send_html_email(subject_template, body_text_template, body_html_template, context, to_email):
+    subject = render_to_string(subject_template, context).strip()
+    text_body = render_to_string(body_text_template, context)
+    html_body = render_to_string(body_html_template, context)
+    msg = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [to_email])
+    msg.attach_alternative(html_body, 'text/html')
+    msg.send(fail_silently=True)
+
+
 def send_verification_email(user):
     uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
@@ -78,10 +87,10 @@ def send_verification_email(user):
         'frontend_url': settings.FRONTEND_URL,
     }
 
-    subject = render_to_string('emails/email_verification_subject.txt', context).strip()
-    text_body = render_to_string('emails/email_verification.txt', context)
-    html_body = render_to_string('emails/email_verification.html', context)
-
-    msg = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [user.email])
-    msg.attach_alternative(html_body, 'text/html')
-    msg.send(fail_silently=True)
+    _send_html_email(
+        subject_template='email_verification_subject.txt',
+        body_text_template='email_verification.txt',
+        body_html_template='email_verification.html',
+        context=context,
+        to_email=user.email,
+    )
