@@ -1,0 +1,10 @@
+Hola {% if user.get_full_name %}{{ user.get_full_name }}{% else %}{{ user.username }}{% endif %},
+
+Gracias por registrarte en Pitahaya Vision. Confirma tu correo abriendo el siguiente enlace:
+
+{{ verification_url }}
+
+Si tú no solicitaste esta cuenta, puedes ignorar este mensaje.
+
+— Equipo Pitahaya Vision
+Correo automático · No responder

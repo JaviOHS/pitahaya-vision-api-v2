@@ -8,8 +8,7 @@ API_PREFIX = 'api/v2/'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # path(f'{API_PREFIX}auth/', include('dj_rest_auth.urls')),
-    # path(f'{API_PREFIX}auth/registration/', include('dj_rest_auth.registration.urls')),
+    path(f'{API_PREFIX}auth/', include('apps.security.urls')),
 ]
 
 if settings.DEBUG:

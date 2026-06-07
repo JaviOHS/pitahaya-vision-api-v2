@@ -1,0 +1,1 @@
+Nueva invitación: {{ event.title }} · Pitahaya Vision

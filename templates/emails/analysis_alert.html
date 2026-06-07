@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerta fitosanitaria · Pitahaya Vision</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:'Lexend','Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#1f2937;">
+
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;padding:48px 16px;">
+    <tr>
+      <td align="center">
+
+        <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:16px;border:1px solid #e5e7eb;box-shadow:0 8px 24px rgba(220,38,38,0.06);overflow:hidden;">
+
+          <!-- Acento superior rojo (severidad) -->
+          <tr>
+            <td style="height:4px;background:linear-gradient(90deg,#dc2626,#ef4444,#dc2626);font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <tr>
+            <td style="padding:36px 44px 28px;border-bottom:1px solid #f3f4f6;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <div style="width:40px;height:40px;border-radius:10px;background:#16a34a;text-align:center;line-height:40px;box-shadow:0 4px 12px rgba(22,163,74,0.20);">
+                      <span style="font-size:20px;line-height:40px;color:#ffffff;">🌿</span>
+                    </div>
+                  </td>
+                  <td style="vertical-align:middle;padding-left:14px;">
+                    <span style="color:#111827;font-size:22px;font-weight:600;font-family:'Cormorant Garamond','Georgia',serif;letter-spacing:-0.01em;">
+                      Pitahaya Vision
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:40px 44px 32px;">
+              <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.18em;">
+                ⚠ Alerta fitosanitaria
+              </p>
+              <h1 style="margin:0 0 12px;font-size:32px;line-height:1.15;color:#111827;font-weight:500;font-family:'Cormorant Garamond','Georgia',serif;letter-spacing:-0.01em;">
+                Posible <em style="color:#dc2626;font-style:italic;">enfermedad</em> detectada
+              </h1>
+              <p style="margin:0 0 24px;font-size:14px;line-height:1.7;color:#6b7280;font-weight:300;">
+                Hola, <strong style="color:#111827;font-weight:500;">{{ owner_name }}</strong>. El último análisis registrado presenta indicadores que requieren tu atención.
+              </p>
+
+              <!-- Detalles del análisis -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px;background:#fef2f2;border:1px solid #fecaca;border-left:3px solid #dc2626;border-radius:0 10px 10px 0;">
+                <tr>
+                  <td style="padding:16px 18px;border-bottom:1px solid #fecaca;">
+                    <p style="margin:0 0 4px;font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.12em;">Diagnóstico</p>
+                    <p style="margin:0;font-size:14px;color:#111827;font-weight:500;">{{ analysis.disease_name|default:'No determinado' }}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 18px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="vertical-align:top;width:50%;padding-right:8px;">
+                          <p style="margin:0 0 4px;font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.12em;">Parcela</p>
+                          <p style="margin:0;font-size:14px;color:#111827;font-weight:500;">{{ analysis.parcel|default:'Sin parcela' }}</p>
+                        </td>
+                        <td style="vertical-align:top;width:50%;padding-left:8px;">
+                          <p style="margin:0 0 4px;font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.12em;">Confianza</p>
+                          <p style="margin:0;font-size:14px;color:#dc2626;font-weight:600;">{{ confidence_percent }}%</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 28px;">
+                <tr>
+                  <td style="border-radius:8px;background:#16a34a;box-shadow:0 4px 12px rgba(22,163,74,0.25);">
+                    <a href="{{ report_url }}" style="display:inline-block;padding:14px 32px;font-size:13px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;letter-spacing:0.04em;text-transform:uppercase;font-family:'Lexend','Segoe UI',Arial,sans-serif;">
+                      Ver reporte completo
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:10px;color:#9ca3af;line-height:1.5;text-transform:uppercase;letter-spacing:0.14em;font-weight:600;">
+                Enlace directo
+              </p>
+              <div style="padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;word-break:break-all;">
+                <a href="{{ report_url }}" style="font-size:12px;color:#16a34a;text-decoration:none;font-family:'Courier New',monospace;">
+                  {{ report_url }}
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:20px 44px;background:#fef2f2;border-top:1px solid #fecaca;border-bottom:1px solid #fecaca;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align:top;width:24px;padding-right:10px;">
+                    <span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#fee2e2;text-align:center;line-height:18px;font-size:11px;color:#dc2626;font-weight:700;">!</span>
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <p style="margin:0;font-size:12px;color:#7f1d1d;line-height:1.6;font-weight:400;">
+                      Recomendamos <strong style="font-weight:600;">revisar la parcela y registrar tratamiento</strong> a la brevedad para evitar la propagación.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 44px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <p style="margin:0;font-size:13px;color:#111827;font-family:'Cormorant Garamond','Georgia',serif;font-style:italic;font-weight:500;">
+                      Equipo Pitahaya Vision
+                    </p>
+                  </td>
+                  <td align="right" style="vertical-align:middle;">
+                    <p style="margin:0;font-size:10px;color:#9ca3af;text-align:right;line-height:1.6;letter-spacing:0.02em;">
+                      © {% now "Y" %} Pitahaya Vision<br>
+                      Correo automático · No responder
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <p style="margin:18px 0 0;font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.18em;font-weight:600;">
+          Sistema de diagnóstico inteligente
+        </p>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
