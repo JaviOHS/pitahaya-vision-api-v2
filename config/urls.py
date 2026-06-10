@@ -9,6 +9,7 @@ API_PREFIX = 'api/v2/'
 urlpatterns = [
     path('admin/', admin.site.urls),
     path(f'{API_PREFIX}auth/', include('apps.security.urls')),
+    path(f'{API_PREFIX}analysis/', include('apps.analysis.urls')),
 ]
 
 if settings.DEBUG:
