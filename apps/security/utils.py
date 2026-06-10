@@ -1,8 +1,12 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
@@ -94,3 +98,45 @@ def send_verification_email(user):
         context=context,
         to_email=user.email,
     )
+
+
+def record_login_attempt(user=None, username='', ip_address=None, user_agent='', successful=False):
+    from .models import LoginAttempt
+    LoginAttempt.objects.create(
+        user=user,
+        username=username,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        successful=successful,
+    )
+
+    if not successful and user:
+        lockout_minutes = getattr(settings, 'LOGIN_LOCKOUT_MINUTES', 15)
+        max_attempts = getattr(settings, 'MAX_LOGIN_ATTEMPTS', 5)
+        cutoff = timezone.now() - timedelta(minutes=lockout_minutes)
+        recent_failures = LoginAttempt.objects.filter(
+            user=user,
+            successful=False,
+            timestamp__gte=cutoff,
+        ).count()
+        if recent_failures >= max_attempts:
+            user.account_locked_until = timezone.now() + timedelta(minutes=lockout_minutes)
+            user.save(update_fields=['account_locked_until'])
+
+
+class PasswordHistoryValidator:
+    def validate(self, password, user=None):
+        if user and user.pk:
+            from .models import PasswordHistory
+            history_entries = PasswordHistory.objects.filter(
+                user=user,
+            ).order_by('-created_at')[:5]
+            from django.contrib.auth.hashers import check_password
+            for entry in history_entries:
+                if check_password(password, entry.password_hash):
+                    raise ValidationError(
+                        'Esta contraseña ya fue utilizada anteriormente. Elige una diferente.',
+                    )
+
+    def get_help_text(self):
+        return 'La contraseña no debe haber sido utilizada anteriormente.'

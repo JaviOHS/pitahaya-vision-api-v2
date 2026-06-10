@@ -1,16 +1,21 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import LoginSerializer, PasswordResetSerializer
 
+from .models import Profile
 from .utils import (
     _resolve_role,
     _resolve_role_label,
     _validate_password_strength,
+    record_login_attempt,
     send_verification_email,
     validate_ecuadorian_dni,
     validate_ecuadorian_phone,
@@ -91,7 +96,7 @@ class CustomRegisterSerializer(RegisterSerializer):
         email = (email or '').strip().lower()
         if email and User.objects.filter(email__iexact=email).exists():
             raise serializers.ValidationError('Este correo ya está registrado.')
-        return email
+        return super().validate_email(email)
 
     def validate_dni(self, value):
         value = validate_ecuadorian_dni(value)
@@ -106,7 +111,8 @@ class CustomRegisterSerializer(RegisterSerializer):
         return value
 
     def validate_password1(self, value):
-        return _validate_password_strength(value)
+        _validate_password_strength(value)
+        return super().validate_password1(value)
 
     def validate(self, data):
         data = super().validate(data)
@@ -144,6 +150,9 @@ class CustomRegisterSerializer(RegisterSerializer):
             pass
 
 
+GENERIC_LOGIN_ERROR = 'Credenciales inválidas.'
+
+
 class CustomLoginSerializer(LoginSerializer):
     username = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
@@ -154,31 +163,41 @@ class CustomLoginSerializer(LoginSerializer):
         email = (attrs.get('email') or '').strip().lower()
         password = attrs.get('password')
         request = self.context.get('request')
+        ip = request.META.get('REMOTE_ADDR') if request else None
+        ua = request.META.get('HTTP_USER_AGENT', '') if request else ''
 
-        user = None
         candidate = None
         if email:
             candidate = User.objects.filter(email__iexact=email).first()
-            if candidate:
-                user = authenticate(request=request, username=candidate.username, password=password)
         elif username:
             candidate = User.objects.filter(username__iexact=username).first() \
                 or User.objects.filter(email__iexact=username).first()
-            user = authenticate(request=request, username=username, password=password)
-            if not user and candidate and candidate.username != username:
-                user = authenticate(request=request, username=candidate.username, password=password)
 
-        if not user and candidate and candidate.check_password(password or ''):
-            if not candidate.is_active:
-                raise serializers.ValidationError({
-                    'detail': 'Tu cuenta no está verificada. Revisa tu correo y haz clic en el enlace de activación.'
-                })
+        attempted_username = candidate.username if candidate else (email or username)
+
+        if candidate and candidate.is_locked():
+            record_login_attempt(candidate, attempted_username, ip, ua, successful=False)
+            raise serializers.ValidationError({'detail': GENERIC_LOGIN_ERROR})
+
+        user = None
+        if candidate:
+            user = authenticate(request=request, username=candidate.username, password=password)
+
+        record_login_attempt(
+            user=candidate,
+            username=attempted_username,
+            ip_address=ip,
+            user_agent=ua,
+            successful=user is not None,
+        )
 
         if not user:
-            raise serializers.ValidationError({'detail': 'Credenciales inválidas.'})
+            raise serializers.ValidationError({'detail': GENERIC_LOGIN_ERROR})
 
         if not user.is_active:
-            raise serializers.ValidationError({'detail': 'La cuenta está deshabilitada.'})
+            user.account_locked_until = timezone.now() + timedelta(minutes=15)
+            user.save(update_fields=['account_locked_until'])
+            raise serializers.ValidationError({'detail': GENERIC_LOGIN_ERROR})
 
         attrs['user'] = user
         return attrs
@@ -234,6 +253,16 @@ class UserSummarySerializer(serializers.ModelSerializer):
 
     def get_role_label(self, obj):
         return _resolve_role_label(obj)
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = [
+            'notifications_enabled', 'language', 'theme',
+            'preferences', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']
 
 
 class EmailVerificationRequestSerializer(serializers.Serializer):

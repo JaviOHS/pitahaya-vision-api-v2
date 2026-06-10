@@ -99,6 +99,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {'NAME': 'apps.security.utils.PasswordHistoryValidator'},
 ]
 
 LANGUAGE_CODE = 'es-ec'
@@ -112,10 +113,17 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# --- Token expiry (hours) ---
+TOKEN_EXPIRY_HOURS = int(os.getenv('TOKEN_EXPIRY_HOURS', '168'))  # 7 días por defecto
+
+# --- Account lockout ---
+MAX_LOGIN_ATTEMPTS = int(os.getenv('MAX_LOGIN_ATTEMPTS', '5'))
+LOGIN_LOCKOUT_MINUTES = int(os.getenv('LOGIN_LOCKOUT_MINUTES', '15'))
+
 # --- DRF ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'apps.security.authentication.ExpiringTokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -126,6 +134,19 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '30/hour',
+        'user': '200/hour',
+        'login': '5/minute',
+        'register': '5/hour',
+        'password_reset': '5/hour',
+        'email_verification': '5/minute',
+        'authenticated_user': '200/hour',
+    },
 }
 
 # # --- CORS ---
@@ -135,12 +156,15 @@ CORS_ALLOW_CREDENTIALS = True
 
 # # --- django-allauth / dj-rest-auth ---
 SITE_ID = 1
-ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'none')
+ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'mandatory')
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = int(os.getenv('ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS', '1'))
 ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
 ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_LOGOUT_ON_GET = True
-LOGIN_URL = '/api/v1/auth/login/'
+ACCOUNT_MAX_EMAIL_ADDRESSES = 1
+ACCOUNT_LOGOUT_ON_GET = False
+ACCOUNT_SESSION_REMEMBER = False
+LOGIN_URL = '/api/v2/auth/login/'
 
 REST_AUTH = {
     'REGISTER_SERIALIZER': 'apps.security.serializers.CustomRegisterSerializer',
@@ -148,6 +172,8 @@ REST_AUTH = {
     'PASSWORD_RESET_SERIALIZER': 'apps.security.serializers.CustomPasswordResetSerializer',
     'USER_DETAILS_SERIALIZER': 'apps.security.serializers.CustomUserDetailsSerializer',
     'TOKEN_MODEL': 'rest_framework.authtoken.models.Token',
+    'SESSION_LOGIN': False,
+    'USE_JWT': False,
 }
 
 # --- Email ---

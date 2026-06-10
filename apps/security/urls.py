@@ -3,7 +3,9 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     ProfileView,
+    ProfilePreferencesView,
     CustomerViewSet,
+    CustomLoginView,
     CustomRegisterView,
     delete_account_view,
     request_verification_email,
@@ -14,10 +16,12 @@ router = DefaultRouter()
 router.register(r'customers', CustomerViewSet)
 
 urlpatterns = [
+    path('login/', CustomLoginView.as_view(), name='rest_login'),
     path('', include('dj_rest_auth.urls')),
     path('registration/', CustomRegisterView.as_view(), name='rest_register'),
     path('registration/', include('dj_rest_auth.registration.urls')),
     path('profile/', ProfileView.as_view(), name='profile'),
+    path('profile/preferences/', ProfilePreferencesView.as_view(), name='profile-preferences'),
     path('account/delete/', delete_account_view, name='delete-account'),
     path('email/verify/request/', request_verification_email, name='verify-email-request'),
     path('email/verify/confirm/', confirm_verification_email, name='verify-email-confirm'),

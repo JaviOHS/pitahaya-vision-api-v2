@@ -1,6 +1,6 @@
 import os
 from django.contrib.auth import get_user_model
-from django.db.models.signals import post_migrate
+from django.db.models.signals import post_migrate, post_save
 from django.dispatch import receiver
 
 
@@ -21,3 +21,17 @@ def create_superuser(sender, **kwargs):
             password=password,
         )
         print(f"[security] Superuser '{username}' creado.")
+
+
+@receiver(post_save, sender=get_user_model())
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        from .models import Profile
+        Profile.objects.get_or_create(user=instance)
+
+
+@receiver(post_save, sender=get_user_model())
+def save_password_history(sender, instance, created, **kwargs):
+    if created and instance.password:
+        from .models import PasswordHistory
+        PasswordHistory.objects.get_or_create(user=instance, password_hash=instance.password)
