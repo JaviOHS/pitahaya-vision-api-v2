@@ -26,14 +26,14 @@ INSTALLED_APPS = [
     'dj_rest_auth',
     'dj_rest_auth.registration',
     'apps.security',
-    # 'apps.analysis',
+    'apps.analysis',
     # 'apps.chatbot',
     # 'apps.knowledge',
 ]
 
 MIGRATION_MODULES = {
     'security': 'apps.security.migrations',
-    # 'analysis': 'apps.analysis.migrations',
+    'analysis': 'apps.analysis.migrations',
     # 'chatbot': 'apps.chatbot.migrations',
     # 'knowledge': 'apps.knowledge.migrations',
 }
@@ -149,12 +149,16 @@ REST_FRAMEWORK = {
     },
 }
 
-# # --- CORS ---
+# --- External microservices ---
+ANALYSIS_SERVICE_URL = os.getenv('ANALYSIS_SERVICE_URL', 'http://localhost:8001')
+ANALYSIS_SERVICE_TIMEOUT = int(os.getenv('ANALYSIS_SERVICE_TIMEOUT', '60'))
+
+# --- CORS ---
 cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins.split(',')]
 CORS_ALLOW_CREDENTIALS = True
 
-# # --- django-allauth / dj-rest-auth ---
+# --- django-allauth / dj-rest-auth ---
 SITE_ID = 1
 ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'mandatory')
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = int(os.getenv('ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS', '1'))
