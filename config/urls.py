@@ -10,6 +10,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path(f'{API_PREFIX}auth/', include('apps.security.urls')),
     path(f'{API_PREFIX}analysis/', include('apps.analysis.urls')),
+    path(f'{API_PREFIX}chatbot/', include('apps.chatbot.urls')),
+    path(f'{API_PREFIX}rag/', include('apps.rag.urls')),
 ]
 
 if settings.DEBUG:

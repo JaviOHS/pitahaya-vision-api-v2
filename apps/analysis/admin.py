@@ -13,6 +13,6 @@ class AnalysisResultAdmin(admin.ModelAdmin):
     search_fields = ('disease_name_predicted', 'user__username', 'user__email')
     readonly_fields = (
         'disease_name_predicted', 'confidence', 'probability',
-        'severity', 'analysis_text', 'recommendation_text', 'created_at',
+        'severity', 'analysis_text', 'recommendations_text', 'created_at',
     )
     ordering = ('-created_at',)

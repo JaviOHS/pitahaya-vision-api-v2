@@ -10,6 +10,7 @@ from .models import AnalysisResult
 from .serializers import AnalysisResultSerializer
 from .services import classify_leaf
 from apps.security.permissions import is_admin as _is_admin
+from apps.chatbot.models import PlantHistory
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,11 @@ class AnalysisListCreateView(generics.ListCreateAPIView):
         return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
-        instance = serializer.save(user=self.request.user)
+        conversation_id = self.request.data.get('conversation')
+        instance = serializer.save(
+            user=self.request.user,
+            conversation_id=conversation_id if conversation_id else None,
+        )
         try:
             instance.image_path.open('rb')
             prediction = classify_leaf(instance.image_path)
@@ -82,17 +87,32 @@ class AnalysisListCreateView(generics.ListCreateAPIView):
             instance.severity = prediction.get('status', 'desconocida')
             instance.disease_name_predicted = prediction.get('disease_name', '')
             instance.confidence = float(prediction.get('confidence', 0.0) or 0.0)
-            instance.recommendation_text = prediction.get('recommendation', '')
+            instance.recommendations_text = prediction.get('recommendation', '')
             instance.save(update_fields=[
-                'severity', 'disease_name_predicted', 'confidence', 'recommendation_text',
+                'severity', 'disease_name_predicted', 'confidence', 'recommendations_text',
             ])
         except Exception as exc:
             logger.exception('Error al clasificar imagen: %s', exc)
 
+        # ── Create PlantHistory if a conversation is linked ──
+        if instance.conversation and instance.conversation.context:
+            try:
+                PlantHistory.objects.create(
+                    context=instance.conversation.context,
+                    analysis_result=instance,
+                    final_diagnosis=instance.disease_name_predicted,
+                    treatment_applied=instance.recommendations_text,
+                    notes=instance.analysis_text,
+                )
+            except Exception as exc:
+                logger.exception('Error al crear PlantHistory: %s', exc)
 
-class AnalysisDetailView(generics.RetrieveDestroyAPIView):
+
+class AnalysisDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AnalysisResultSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         qs = AnalysisResult.objects.select_related('user').all()

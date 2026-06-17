@@ -32,6 +32,8 @@ class AnalysisResultSerializer(serializers.ModelSerializer):
         model = AnalysisResult
         fields = [
             'id',
+            'conversation',
+            'chat_message',
             'image_path',
             'image_url',
             'disease_name_predicted',
@@ -40,7 +42,7 @@ class AnalysisResultSerializer(serializers.ModelSerializer):
             'probability',
             'severity',
             'analysis_text',
-            'recommendation_text',
+            'recommendations_text',
             'created_at',
             'owner_name',
             'owner_email',
@@ -54,7 +56,7 @@ class AnalysisResultSerializer(serializers.ModelSerializer):
             'probability',
             'severity',
             'analysis_text',
-            'recommendation_text',
+            'recommendations_text',
             'created_at',
             'owner_name',
             'owner_email',

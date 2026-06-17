@@ -29,7 +29,7 @@ class Context(models.Model):
     plot = models.ForeignKey(Plot, on_delete=models.CASCADE, related_name='contexts')
     plant_key_or_id = models.CharField(max_length=120, default='', blank=True)
     affected_part = models.CharField(max_length=120, default='', blank=True)
-    main_symptoms = models.TextField(default='', blank=True)
+    main_symptom = models.TextField(default='', blank=True)
     status = models.CharField(max_length=20, default='desconocida', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -37,17 +37,26 @@ class Context(models.Model):
         return f'Contexto de {self.plot}'
     
 class Conversation(models.Model):
-    context = models.ForeignKey(Context, on_delete=models.CASCADE, related_name='conversations')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversations',
+        null=True, blank=True,
+    )
+    context = models.ForeignKey(Context, on_delete=models.CASCADE, related_name='conversations', null=True, blank=True)
     title = models.CharField(max_length=200, default='', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f'Conversación de {self.user.username} ({self.created_at:%Y-%m-%d %H:%M})'
+        return f'Conversación de {self.user.username if self.user else "?"} ({self.created_at:%Y-%m-%d %H:%M})'
     
 class ChatMessage(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     role = models.CharField(max_length=20, default='user')  # 'user' o 'assistant'
-    content = models.TextField()
+    content = models.TextField(blank=True, default='')
+    image_type = models.CharField(max_length=100, default='', blank=True)
+    image_path = models.CharField(max_length=500, default='', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -56,12 +65,15 @@ class ChatMessage(models.Model):
 class PlantHistory(models.Model):
     context = models.ForeignKey(Context, on_delete=models.CASCADE, related_name='plant_histories')
     analysis_result = models.ForeignKey(AnalysisResult, on_delete=models.SET_NULL, null=True, blank=True)
-    final_diagnosis = models.CharField(max_length=120, default='', blank=True)
+    final_diagnosis = models.CharField(max_length=255, default='', blank=True)
     treatment_applied = models.TextField(default='', blank=True)
     notes = models.TextField(default='', blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'Historial de planta {self.plant_key_or_id} en {self.plot}'
+        ctx = self.context
+        plant = ctx.plant_key_or_id if ctx else '?'
+        plot_name = ctx.plot if ctx else '?'
+        return f'Historial de planta {plant} en {plot_name}'
     

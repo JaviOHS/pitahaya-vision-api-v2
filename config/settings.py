@@ -27,15 +27,15 @@ INSTALLED_APPS = [
     'dj_rest_auth.registration',
     'apps.security',
     'apps.analysis',
-    # 'apps.chatbot',
-    # 'apps.knowledge',
+    'apps.chatbot',
+    'apps.rag',
 ]
 
 MIGRATION_MODULES = {
     'security': 'apps.security.migrations',
     'analysis': 'apps.analysis.migrations',
-    # 'chatbot': 'apps.chatbot.migrations',
-    # 'knowledge': 'apps.knowledge.migrations',
+    'chatbot': 'apps.chatbot.migrations',
+    'rag': 'apps.rag.migrations',
 }
 
 MIDDLEWARE = [
@@ -140,12 +140,12 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '30/hour',
-        'user': '200/hour',
+        'user': '300/hour',
         'login': '5/minute',
         'register': '5/hour',
         'password_reset': '5/hour',
         'email_verification': '5/minute',
-        'authenticated_user': '200/hour',
+        'authenticated_user': '300/hour',
     },
 }
 
