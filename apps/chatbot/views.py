@@ -46,13 +46,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return Conversation.objects.filter(user=self.request.user).prefetch_related('messages').order_by('-updated_at')
 
     def perform_create(self, serializer):
-        if not serializer.validated_data.get('context'):
-            from .models import Context, Plot
-            default_plot = Plot.objects.filter(farm__user=self.request.user).first()
-            if default_plot:
-                ctx = Context.objects.create(plot=default_plot)
-                serializer.save(user=self.request.user, context=ctx)
-                return
         serializer.save(user=self.request.user)
 
 

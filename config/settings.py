@@ -76,6 +76,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # --- Database (PostgreSQL o SQLite según DB_ENGINE) ---
 DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite')
 if DB_ENGINE == 'postgresql':
+    os.environ.setdefault('PGCLIENTENCODING', 'UTF8')
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -84,6 +85,7 @@ if DB_ENGINE == 'postgresql':
             'PASSWORD': os.getenv('DB_PASSWORD', 'pitahaya_pass'),
             'HOST': os.getenv('DB_HOST', 'localhost'),
             'PORT': os.getenv('DB_PORT', '5432'),
+            'OPTIONS': {'client_encoding': 'UTF8'},
         }
     }
 else:
@@ -140,12 +142,12 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '30/hour',
-        'user': '300/hour',
+        'user': '500/hour',
         'login': '5/minute',
         'register': '5/hour',
         'password_reset': '5/hour',
         'email_verification': '5/minute',
-        'authenticated_user': '300/hour',
+        'authenticated_user': '500/hour',
     },
 }
 
