@@ -7,3 +7,8 @@ python-dotenv>=1.0
 psycopg2-binary>=2.9
 requests>=2.31
 Pillow>=10.0
+
+# RAG — búsqueda semántica multilingüe
+sentence-transformers>=2.7.0
+pypdf>=4.0.0
+numpy>=1.26.0

@@ -1,10 +1,16 @@
 import logging
+import urllib.request
+import urllib.parse
+import json as _json
 from datetime import timedelta
 
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import generics, permissions
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.response import Response
 
 from .models import AnalysisResult
 from .serializers import AnalysisResultSerializer
@@ -119,3 +125,56 @@ class AnalysisDetailView(generics.RetrieveUpdateDestroyAPIView):
         if not _is_admin(self.request.user):
             qs = qs.filter(user=self.request.user)
         return qs
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def weather_proxy(request):
+    lat = request.query_params.get('lat', '').strip()
+    lon = request.query_params.get('lon', '').strip()
+    if not lat or not lon:
+        return Response({'error': 'lat y lon son requeridos'}, status=400)
+
+    api_key = settings.VISUAL_CROSSING_API_KEY
+    if not api_key:
+        return Response({'error': 'API key no configurada'}, status=503)
+
+    params = urllib.parse.urlencode({
+        'unitGroup': 'metric',
+        'key': api_key,
+        'include': 'days',
+        'elements': 'datetime,precip,humidity,temp',
+        'contentType': 'json',
+    })
+    url = f'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{lat},{lon}/last3days?{params}'
+
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = _json.loads(resp.read().decode())
+    except Exception as e:
+        logger.warning('WeatherProxy error: %s', e)
+        return Response({'error': 'No se pudo obtener el clima'}, status=502)
+
+    days = data.get('days', [])
+    if not days:
+        return Response({'error': 'Sin datos de clima'}, status=502)
+
+    total_precip = sum(d.get('precip') or 0 for d in days)
+    avg_humidity = sum(d.get('humidity') or 0 for d in days) / len(days)
+    avg_temp = sum(d.get('temp') or 0 for d in days) / len(days)
+
+    if total_precip > 10:
+        condition = 'Lluvioso'
+    elif avg_humidity > 75:
+        condition = 'Húmedo sin lluvia'
+    elif total_precip < 1 and avg_humidity < 60:
+        condition = 'Período seco'
+    else:
+        condition = 'Normal para la época'
+
+    return Response({
+        'totalPrecip': round(total_precip, 1),
+        'avgHumidity': round(avg_humidity),
+        'avgTemp': round(avg_temp),
+        'condition': condition,
+    })

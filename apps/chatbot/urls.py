@@ -1,6 +1,16 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from .views import ContextViewSet, FarmViewSet, PlantHistoryViewSet, PlotViewSet, ConversationViewSet, ChatMessageViewSet
+
+from .views import (
+    AskChatbotView,
+    SuggestQuestionsView,
+    ContextViewSet,
+    FarmViewSet,
+    PlantHistoryViewSet,
+    PlotViewSet,
+    ConversationViewSet,
+    ChatMessageViewSet,
+)
 
 router = DefaultRouter()
 router.register(r'farms', FarmViewSet, basename='farm')
@@ -12,4 +22,6 @@ router.register(r'plant-histories', PlantHistoryViewSet, basename='plant-history
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('chat/', AskChatbotView.as_view(), name='chatbot-ask'),
+    path('suggest/', SuggestQuestionsView.as_view(), name='chatbot-suggest'),
 ]

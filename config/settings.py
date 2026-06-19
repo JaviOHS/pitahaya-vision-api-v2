@@ -154,6 +154,7 @@ REST_FRAMEWORK = {
 # --- External microservices ---
 ANALYSIS_SERVICE_URL = os.getenv('ANALYSIS_SERVICE_URL', 'http://localhost:8001')
 ANALYSIS_SERVICE_TIMEOUT = int(os.getenv('ANALYSIS_SERVICE_TIMEOUT', '60'))
+VISUAL_CROSSING_API_KEY = os.getenv('VISUAL_CROSSING_API_KEY', '')
 
 # --- CORS ---
 cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173')
@@ -218,7 +219,7 @@ if 'smtp' in EMAIL_BACKEND:
     EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
 
 # --- External microservices ---
-# CHATBOT_SERVICE_URL = os.getenv('CHATBOT_SERVICE_URL', '')
-# CHATBOT_SERVICE_TIMEOUT = int(os.getenv('CHATBOT_SERVICE_TIMEOUT', '120'))
+CHATBOT_SERVICE_URL = os.getenv('CHATBOT_SERVICE_URL', '')
+CHATBOT_SERVICE_TIMEOUT = int(os.getenv('CHATBOT_SERVICE_TIMEOUT', '120'))
 # ANALYSIS_SERVICE_URL = os.getenv('ANALYSIS_SERVICE_URL', '')
 # ANALYSIS_SERVICE_TIMEOUT = int(os.getenv('ANALYSIS_SERVICE_TIMEOUT', '60'))
