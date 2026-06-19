@@ -77,3 +77,4 @@ class PlantHistory(models.Model):
         plot_name = ctx.plot if ctx else '?'
         return f'Historial de planta {plant} en {plot_name}'
     
+    
