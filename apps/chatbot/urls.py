@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AskChatbotView,
     SuggestQuestionsView,
+    HeatmapAnalysisView,
     ContextViewSet,
     FarmViewSet,
     PlantHistoryViewSet,
@@ -24,4 +25,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('chat/', AskChatbotView.as_view(), name='chatbot-ask'),
     path('suggest/', SuggestQuestionsView.as_view(), name='chatbot-suggest'),
+    path('heatmap-analysis/', HeatmapAnalysisView.as_view(), name='chatbot-heatmap-analysis'),
 ]

@@ -242,6 +242,39 @@ class SuggestQuestionsView(APIView):
         return Response({'suggestions': suggestions})
 
 
+class HeatmapAnalysisView(APIView):
+    """
+    Genera un análisis agrónomo del mapa de calor usando Gemma 3.
+
+    POST /api/v2/chatbot/heatmap-analysis/
+    Body: { "summary": "resumen en texto de los datos del mapa" }
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        summary = request.data.get('summary', '').strip()
+        if not summary:
+            return Response({'error': 'summary es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        prompt = (
+            'Eres un agrónomo experto en cultivos de pitahaya. '
+            'Analiza los siguientes datos del mapa de calor de detección de enfermedades en la finca.\n\n'
+            'FORMATO OBLIGATORIO — usa exactamente estos encabezados markdown:\n'
+            '## Diagnóstico general\n'
+            '<párrafo con el estado fitosanitario general>\n\n'
+            '## Zonas de riesgo\n'
+            '<lista con guiones de patrones o zonas detectadas>\n\n'
+            '## Recomendaciones\n'
+            '<lista con guiones de acciones concretas preventivas y correctivas>\n\n'
+            'Sé conciso y profesional. No agregues secciones adicionales.\n\n'
+            f'DATOS DEL MAPA DE CALOR:\n{summary}'
+        )
+
+        analysis = chatbot_client.chat(message=prompt, context='', max_length=600)
+        return Response({'analysis': analysis})
+
+
 def _build_rag_context(query: str) -> str:
     """Recupera los chunks más relevantes de la base de conocimiento RAG."""
     try:

@@ -82,9 +82,19 @@ class AnalysisListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         conversation_id = self.request.data.get('conversation')
+        try:
+            lat = float(self.request.data.get('latitude') or '')
+        except (ValueError, TypeError):
+            lat = None
+        try:
+            lon = float(self.request.data.get('longitude') or '')
+        except (ValueError, TypeError):
+            lon = None
         instance = serializer.save(
             user=self.request.user,
             conversation_id=conversation_id if conversation_id else None,
+            latitude=lat,
+            longitude=lon,
         )
         try:
             instance.image_path.open('rb')
@@ -143,7 +153,7 @@ def weather_proxy(request):
         'unitGroup': 'metric',
         'key': api_key,
         'include': 'days',
-        'elements': 'datetime,precip,humidity,temp',
+        'elements': 'datetime,precip,humidity,temp,tempmin,tempmax,windspeed',
         'contentType': 'json',
     })
     url = f'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{lat},{lon}/last3days?{params}'
@@ -162,6 +172,9 @@ def weather_proxy(request):
     total_precip = sum(d.get('precip') or 0 for d in days)
     avg_humidity = sum(d.get('humidity') or 0 for d in days) / len(days)
     avg_temp = sum(d.get('temp') or 0 for d in days) / len(days)
+    avg_wind = sum(d.get('windspeed') or 0 for d in days) / len(days)
+    temp_min = min((d.get('tempmin') or d.get('temp') or 0) for d in days)
+    temp_max = max((d.get('tempmax') or d.get('temp') or 0) for d in days)
 
     if total_precip > 10:
         condition = 'Lluvioso'
@@ -172,9 +185,26 @@ def weather_proxy(request):
     else:
         condition = 'Normal para la época'
 
+    days_out = [
+        {
+            'date':     d.get('datetime', ''),
+            'temp':     round(d.get('temp') or 0, 1),
+            'tempMin':  round(d.get('tempmin') or d.get('temp') or 0, 1),
+            'tempMax':  round(d.get('tempmax') or d.get('temp') or 0, 1),
+            'precip':   round(d.get('precip') or 0, 1),
+            'humidity': round(d.get('humidity') or 0),
+            'wind':     round(d.get('windspeed') or 0, 1),
+        }
+        for d in days
+    ]
+
     return Response({
         'totalPrecip': round(total_precip, 1),
         'avgHumidity': round(avg_humidity),
-        'avgTemp': round(avg_temp),
-        'condition': condition,
+        'avgTemp':     round(avg_temp, 1),
+        'tempMin':     round(temp_min, 1),
+        'tempMax':     round(temp_max, 1),
+        'avgWind':     round(avg_wind, 1),
+        'condition':   condition,
+        'days':        days_out,
     })

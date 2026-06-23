@@ -12,6 +12,8 @@ class AnalysisResult(models.Model):
     severity = models.CharField(max_length=20, default='desconocida', blank=True)
     analysis_text = models.TextField(default='', blank=True)
     recommendations_text = models.TextField(default='', blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

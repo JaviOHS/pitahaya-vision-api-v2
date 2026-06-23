@@ -142,12 +142,12 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '30/hour',
-        'user': '500/hour',
+        'user': '300/hour',
         'login': '5/minute',
         'register': '5/hour',
         'password_reset': '5/hour',
         'email_verification': '5/minute',
-        'authenticated_user': '500/hour',
+        'authenticated_user': '300/hour',
     },
 }
 

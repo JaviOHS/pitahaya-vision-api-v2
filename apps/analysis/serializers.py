@@ -43,6 +43,8 @@ class AnalysisResultSerializer(serializers.ModelSerializer):
             'severity',
             'analysis_text',
             'recommendations_text',
+            'latitude',
+            'longitude',
             'created_at',
             'owner_name',
             'owner_email',
