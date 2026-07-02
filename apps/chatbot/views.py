@@ -1,6 +1,7 @@
 import logging
 import re
 
+from django.http import StreamingHttpResponse
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -156,6 +157,7 @@ class AskChatbotView(APIView):
                 Conversation.objects
                 .filter(id=conversation_id, user=user)
                 .select_related('context__plot__farm')
+                .prefetch_related('context__plant_histories')
                 .first()
             )
             if not conv or not conv.context:
@@ -187,6 +189,13 @@ class AskChatbotView(APIView):
             if ctx.status:
                 parts.append(f'Estado de la planta: {ctx.status}')
 
+            latest_history = ctx.plant_histories.order_by('-created_at').first()
+            if latest_history:
+                if latest_history.final_diagnosis:
+                    parts.append(f'Diagnóstico IA previo: {latest_history.final_diagnosis}')
+                if latest_history.treatment_applied:
+                    parts.append(f'Tratamiento recomendado: {latest_history.treatment_applied}')
+
             if not parts:
                 return ''
 
@@ -195,6 +204,46 @@ class AskChatbotView(APIView):
         except Exception:
             logger.exception('Error construyendo contexto agrícola para conv=%s', conversation_id)
             return ''
+
+
+class StreamChatbotView(AskChatbotView):
+    """
+    Versión streaming de AskChatbotView.
+    Devuelve SSE (text/event-stream) con tokens a medida que Gemma los genera.
+
+    POST /api/v2/chatbot/chat/stream/
+    Body: { "message": "...", "conversation_id": <int|null>, "max_length": 250 }
+    """
+
+    def post(self, request):
+        message = request.data.get('message', '').strip()
+        conversation_id = request.data.get('conversation_id')
+        max_length = int(request.data.get('max_length', 250))
+        no_rag = bool(request.data.get('no_rag', False))
+
+        if not message:
+            return Response(
+                {'error': 'El campo message es requerido.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        farm_context = self._build_farm_context(conversation_id, request.user)
+        rag_context = '' if no_rag else _build_rag_context(message)
+        full_context = _merge_contexts(farm_context, rag_context)
+
+        def stream():
+            try:
+                yield from chatbot_client.chat_stream(message, full_context, max_length)
+            except Exception:
+                import json as _json
+                logger.exception('Error en StreamChatbotView')
+                yield b"data: " + _json.dumps({'token': 'Error al generar respuesta.', 'done': False}).encode() + b"\n\n"
+                yield b"data: " + _json.dumps({'token': '', 'done': True}).encode() + b"\n\n"
+
+        response = StreamingHttpResponse(stream(), content_type='text/event-stream')
+        response['Cache-Control'] = 'no-cache'
+        response['X-Accel-Buffering'] = 'no'
+        return response
 
 
 def _parse_suggestions(raw: str) -> list[str]:
@@ -235,8 +284,12 @@ class SuggestQuestionsView(APIView):
             'sin numeración, sin viñetas, sin texto adicional.'
         )
 
-        raw = chatbot_client.chat(message=prompt, context='', max_length=180)
-        suggestions = _parse_suggestions(raw)
+        try:
+            raw = chatbot_client.chat(message=prompt, context='', max_length=180)
+            suggestions = _parse_suggestions(raw)
+        except Exception:
+            logger.warning('Gemma no disponible para sugerencias; retornando lista vacía.')
+            return Response({'suggestions': []})
 
         logger.info('Sugerencias generadas: %s', suggestions)
         return Response({'suggestions': suggestions})

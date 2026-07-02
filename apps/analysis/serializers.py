@@ -14,6 +14,14 @@ class AnalysisResultSerializer(serializers.ModelSerializer):
     owner_name = serializers.SerializerMethodField()
     owner_email = serializers.SerializerMethodField()
 
+    def validate_conversation(self, value):
+        request = self.context.get('request')
+        if value and request and value.user_id != request.user.pk:
+            raise serializers.ValidationError(
+                'Esta conversación no existe o no te pertenece.'
+            )
+        return value
+
     def validate_image_path(self, value):
         if value is None:
             raise serializers.ValidationError('La imagen es obligatoria.')

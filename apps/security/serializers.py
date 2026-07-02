@@ -15,6 +15,7 @@ from .utils import (
     _resolve_role,
     _resolve_role_label,
     _validate_password_strength,
+    email_verification_token_generator,
     record_login_attempt,
     send_verification_email,
     validate_ecuadorian_dni,
@@ -192,11 +193,10 @@ class CustomLoginSerializer(LoginSerializer):
         )
 
         if not user:
-            raise serializers.ValidationError({'detail': GENERIC_LOGIN_ERROR})
-
-        if not user.is_active:
-            user.account_locked_until = timezone.now() + timedelta(minutes=15)
-            user.save(update_fields=['account_locked_until'])
+            if candidate and not candidate.is_active:
+                raise serializers.ValidationError(
+                    {'detail': 'Tu cuenta no está activa. Revisa tu correo y verifica tu cuenta antes de iniciar sesión.'}
+                )
             raise serializers.ValidationError({'detail': GENERIC_LOGIN_ERROR})
 
         attrs['user'] = user
@@ -235,7 +235,7 @@ class UserSummarySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'phone', 'dni', 'is_active', 'full_name',
-            'profile_photo_url', 'role', 'role_label',
+            'profile_photo_url', 'role', 'role_label', 'date_joined',
         ]
 
     def get_full_name(self, obj):
@@ -280,7 +280,7 @@ class EmailVerificationConfirmSerializer(serializers.Serializer):
         except Exception as exc:
             raise serializers.ValidationError({'detail': 'Enlace inválido.'}) from exc
 
-        if not default_token_generator.check_token(user, attrs['token']):
+        if not email_verification_token_generator.check_token(user, attrs['token']):
             raise serializers.ValidationError({'detail': 'Token inválido o expirado.'})
 
         attrs['user'] = user

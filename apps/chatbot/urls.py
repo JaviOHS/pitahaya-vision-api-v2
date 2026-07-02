@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AskChatbotView,
+    StreamChatbotView,
     SuggestQuestionsView,
     HeatmapAnalysisView,
     ContextViewSet,
@@ -24,6 +25,7 @@ router.register(r'plant-histories', PlantHistoryViewSet, basename='plant-history
 urlpatterns = [
     path('', include(router.urls)),
     path('chat/', AskChatbotView.as_view(), name='chatbot-ask'),
+    path('chat/stream/', StreamChatbotView.as_view(), name='chatbot-ask-stream'),
     path('suggest/', SuggestQuestionsView.as_view(), name='chatbot-suggest'),
     path('heatmap-analysis/', HeatmapAnalysisView.as_view(), name='chatbot-heatmap-analysis'),
 ]

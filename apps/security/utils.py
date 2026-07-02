@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.tokens import PasswordResetTokenGenerator, default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -10,6 +10,20 @@ from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
+
+
+EMAIL_VERIFICATION_TIMEOUT = 86400  # 1 día en segundos
+
+
+class EmailVerificationTokenGenerator(PasswordResetTokenGenerator):
+    """Token de verificación de correo con expiración de 1 día."""
+    key_salt = 'apps.security.utils.EmailVerificationTokenGenerator'
+
+    def _check_timeout(self, ts):
+        return (self._num_seconds(self._now()) - ts) <= EMAIL_VERIFICATION_TIMEOUT
+
+
+email_verification_token_generator = EmailVerificationTokenGenerator()
 
 
 def _validate_password_strength(value):
@@ -82,7 +96,7 @@ def _send_html_email(subject_template, body_text_template, body_html_template, c
 
 def send_verification_email(user):
     uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-    token = default_token_generator.make_token(user)
+    token = email_verification_token_generator.make_token(user)
     verification_url = f'{settings.EMAIL_VERIFICATION_FRONTEND_URL}?uid={uidb64}&token={token}'
 
     context = {
