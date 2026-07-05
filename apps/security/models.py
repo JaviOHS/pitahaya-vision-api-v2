@@ -32,6 +32,7 @@ class User(AbstractUser):
     last_login_ip = models.GenericIPAddressField(blank=True, null=True, verbose_name='Última IP')
     last_password_change = models.DateTimeField(blank=True, null=True, verbose_name='Último cambio de contraseña')
     account_locked_until = models.DateTimeField(blank=True, null=True, verbose_name='Bloqueado hasta')
+    email_verified = models.BooleanField(default=False, verbose_name='Correo verificado')
 
     class Meta:
         constraints = [
@@ -80,6 +81,20 @@ class Profile(models.Model):
         verbose_name='Usuario',
     )
     notifications_enabled = models.BooleanField(default=True, verbose_name='Notificaciones activadas')
+    NOTIFY_SEVERITY_CHOICES = [
+        ('ninguna', 'Ninguna'),
+        ('baja', 'Baja'),
+        ('moderada', 'Moderada'),
+        ('alta', 'Alta'),
+        ('critica', 'Crítica'),
+        ('todas', 'Todas'),
+    ]
+    notify_severity_threshold = models.CharField(
+        max_length=10,
+        choices=NOTIFY_SEVERITY_CHOICES,
+        default='todas',
+        verbose_name='Severidad mínima para notificar por correo',
+    )
     language = models.CharField(
         max_length=10,
         choices=[('es', 'Español'), ('en', 'English')],

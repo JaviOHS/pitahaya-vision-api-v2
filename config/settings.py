@@ -124,6 +124,7 @@ LOGIN_LOCKOUT_MINUTES = int(os.getenv('LOGIN_LOCKOUT_MINUTES', '15'))
 
 # --- DRF ---
 REST_FRAMEWORK = {
+    'EXCEPTION_HANDLER': 'apps.security.exceptions.custom_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'apps.security.authentication.ExpiringTokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
@@ -147,6 +148,7 @@ REST_FRAMEWORK = {
         'register': '5/hour',
         'password_reset': '5/hour',
         'email_verification': '5/minute',
+        'availability': '30/minute',
         'authenticated_user': '300/hour',
     },
 }

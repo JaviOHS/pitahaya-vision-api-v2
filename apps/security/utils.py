@@ -46,9 +46,10 @@ def validate_ecuadorian_dni(value):
     if province < 1 or province > 24:
         raise serializers.ValidationError('Cédula inválida: provincia no reconocida.')
 
-    if int(value[2]) >= 6:
-        raise serializers.ValidationError('Cédula inválida: tercer dígito debe ser menor a 6.')
-
+    # Nota: la restricción de "tercer dígito menor a 6" no es una regla oficial
+    # del Registro Civil (no consta en ningún instructivo, reglamento o ley);
+    # el único mecanismo de validación formalmente aceptado es el dígito
+    # verificador (algoritmo Módulo 10) calculado a continuación.
     coefficients = [2, 1, 2, 1, 2, 1, 2, 1, 2]
     total = 0
     for i in range(9):
@@ -92,6 +93,53 @@ def _send_html_email(subject_template, body_text_template, body_html_template, c
     msg = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [to_email])
     msg.attach_alternative(html_body, 'text/html')
     msg.send(fail_silently=True)
+
+
+def notifications_enabled_for(user):
+    """Preferencia maestra de notificaciones (Configuraciones > Notificaciones)."""
+    profile = getattr(user, 'profile', None)
+    return profile is None or profile.notifications_enabled
+
+
+def send_notification_email(user, subject, heading, message, details=None):
+    """Envía un correo de notificación genérico (mismo estilo que el de
+    verificación de cuenta), respetando la preferencia notifications_enabled.
+    No usarlo directamente para análisis: para eso ver
+    apps.analysis.notifications.notify_analysis_result, que además filtra
+    por el umbral de severidad elegido por el usuario.
+
+    `details` (opcional): lista de dicts {'label', 'value', 'url' (opcional)}
+    que se muestran como una lista de datos adicionales bajo el mensaje
+    principal (ej. ubicación, finca, parcela, fecha del análisis).
+    """
+    if not user or not user.email or not notifications_enabled_for(user):
+        return
+
+    context = {
+        'user': user,
+        'heading': heading,
+        'message': message,
+        'details': details or [],
+        'frontend_url': settings.FRONTEND_URL,
+    }
+    text_body = render_to_string('notification_email.txt', context)
+    html_body = render_to_string('notification_email.html', context)
+    msg = EmailMultiAlternatives(subject, text_body, settings.DEFAULT_FROM_EMAIL, [user.email])
+    msg.attach_alternative(html_body, 'text/html')
+    msg.send(fail_silently=True)
+
+
+def notify_admins(subject, heading, message, details=None, exclude_user=None):
+    """Envía el mismo correo de notificación a todos los administradores
+    (cada uno respeta su propia preferencia notifications_enabled).
+    `exclude_user`: opcional, para no notificar al propio admin cuando él es
+    quien generó el evento (ej. su propio análisis crítico)."""
+    from .permissions import get_admin_users
+    admins = get_admin_users()
+    if exclude_user is not None:
+        admins = admins.exclude(pk=exclude_user.pk)
+    for admin in admins:
+        send_notification_email(admin, subject, heading, message, details=details)
 
 
 def send_verification_email(user):

@@ -1,0 +1,13 @@
+{% autoescape off %}Hola {% if user.get_full_name %}{{ user.get_full_name }}{% else %}{{ user.username }}{% endif %},
+
+{{ heading }}
+
+{{ message }}
+{% if details %}
+{% for d in details %}
+- {{ d.label }}: {{ d.value }}{% if d.url %} ({{ d.url }}){% endif %}
+{% endfor %}
+{% endif %}
+— Equipo Pitahaya Vision
+Correo automático · No responder
+{% endautoescape %}

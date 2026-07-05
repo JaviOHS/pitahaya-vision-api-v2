@@ -5,6 +5,14 @@ def is_admin(user):
     return bool(user and user.is_authenticated and (user.is_staff or user.is_superuser))
 
 
+def get_admin_users():
+    """Todos los usuarios con rol de administrador (is_staff o is_superuser)."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+    User = get_user_model()
+    return User.objects.filter(Q(is_staff=True) | Q(is_superuser=True))
+
+
 class IsAdmin(permissions.BasePermission):
     """Permite acceso solo a administradores (is_staff o is_superuser)."""
 

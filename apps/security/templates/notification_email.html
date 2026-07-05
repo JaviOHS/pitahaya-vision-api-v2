@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>{{ heading }} · Pitahaya Vision</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Lexend:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:'Lexend','Segoe UI',Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#1f2937;">
+
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    {{ message }}
+  </div>
+
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;padding:48px 16px;">
+    <tr>
+      <td align="center">
+
+        <table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:16px;border:1px solid #e5e7eb;box-shadow:0 8px 24px rgba(22,163,74,0.06);overflow:hidden;">
+
+          <tr>
+            <td style="height:4px;background:linear-gradient(90deg,#16a34a,#22c55e,#16a34a);font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+
+          <tr>
+            <td style="padding:36px 44px 28px;border-bottom:1px solid #f3f4f6;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <div style="width:40px;height:40px;border-radius:10px;background:#16a34a;text-align:center;line-height:40px;box-shadow:0 4px 12px rgba(22,163,74,0.20);">
+                      <span style="font-size:20px;line-height:40px;color:#ffffff;">🌿</span>
+                    </div>
+                  </td>
+                  <td style="vertical-align:middle;padding-left:14px;">
+                    <span style="color:#111827;font-size:22px;font-weight:600;font-family:'Cormorant Garamond','Georgia',serif;letter-spacing:-0.01em;">
+                      Pitahaya Vision
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:40px 44px 32px;">
+              <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#16a34a;text-transform:uppercase;letter-spacing:0.18em;">
+                Notificación
+              </p>
+              <h1 style="margin:0 0 12px;font-size:32px;line-height:1.15;color:#111827;font-weight:500;font-family:'Cormorant Garamond','Georgia',serif;letter-spacing:-0.01em;">
+                {{ heading }}
+              </h1>
+              <p style="margin:0;font-size:14px;line-height:1.7;color:#6b7280;font-weight:300;">
+                Hola{% if user.get_full_name %}, <strong style="color:#111827;font-weight:500;">{{ user.get_full_name }}</strong>{% elif user.username %}, <strong style="color:#111827;font-weight:500;">{{ user.username }}</strong>{% endif %}. {{ message }}
+              </p>
+
+              {% if details %}
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:20px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;">
+                <tr>
+                  <td style="padding:16px 18px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                      {% for d in details %}
+                      <tr>
+                        <td style="padding:{% if not forloop.first %}8px 0 0{% else %}0{% endif %} 12px 0 0;vertical-align:top;white-space:nowrap;">
+                          <span style="font-size:11px;font-weight:600;color:#16a34a;text-transform:uppercase;letter-spacing:0.06em;">{{ d.label }}</span>
+                        </td>
+                        <td style="padding:{% if not forloop.first %}8px 0 0{% else %}0{% endif %} 0 0;vertical-align:top;">
+                          {% if d.url %}
+                          <a href="{{ d.url }}" style="font-size:13px;color:#111827;text-decoration:none;">{{ d.value }}</a>
+                          {% else %}
+                          <span style="font-size:13px;color:#111827;">{{ d.value }}</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              {% endif %}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 44px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <p style="margin:0;font-size:13px;color:#111827;font-family:'Cormorant Garamond','Georgia',serif;font-style:italic;font-weight:500;">
+                      Equipo Pitahaya Vision
+                    </p>
+                  </td>
+                  <td align="right" style="vertical-align:middle;">
+                    <p style="margin:0;font-size:10px;color:#9ca3af;text-align:right;line-height:1.6;letter-spacing:0.02em;">
+                      © {% now "Y" %} Pitahaya Vision<br>
+                      Correo automático · No responder
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <p style="margin:18px 0 0;font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.18em;font-weight:600;">
+          Sistema de diagnóstico inteligente
+        </p>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

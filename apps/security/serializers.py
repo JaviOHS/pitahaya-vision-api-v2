@@ -194,6 +194,10 @@ class CustomLoginSerializer(LoginSerializer):
 
         if not user:
             if candidate and not candidate.is_active:
+                if candidate.email_verified:
+                    raise serializers.ValidationError(
+                        {'detail': 'Tu cuenta ha sido suspendida temporalmente. Ponte en contacto con el administrador para habilitar tu acceso nuevamente.'}
+                    )
                 raise serializers.ValidationError(
                     {'detail': 'Tu cuenta no está activa. Revisa tu correo y verifica tu cuenta antes de iniciar sesión.'}
                 )
@@ -259,7 +263,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = [
-            'notifications_enabled', 'language', 'theme',
+            'notifications_enabled', 'notify_severity_threshold', 'language', 'theme',
             'preferences', 'created_at', 'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at']

@@ -10,6 +10,7 @@ from .views import (
     delete_account_view,
     request_verification_email,
     confirm_verification_email,
+    check_availability,
 )
 
 router = DefaultRouter()
@@ -25,5 +26,6 @@ urlpatterns = [
     path('account/delete/', delete_account_view, name='delete-account'),
     path('email/verify/request/', request_verification_email, name='verify-email-request'),
     path('email/verify/confirm/', confirm_verification_email, name='verify-email-confirm'),
+    path('availability/', check_availability, name='check-availability'),
     path('', include(router.urls)),
 ]

@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from .models import AnalysisResult
 from .serializers import AnalysisResultSerializer
 from .services import classify_leaf
+from .notifications import notify_analysis_result, notify_admins_of_critical_analysis
 from apps.security.permissions import is_admin as _is_admin
 from apps.chatbot.models import PlantHistory
 
@@ -107,6 +108,8 @@ class AnalysisListCreateView(generics.ListCreateAPIView):
             instance.save(update_fields=[
                 'severity', 'disease_name_predicted', 'confidence', 'recommendations_text',
             ])
+            notify_analysis_result(instance)
+            notify_admins_of_critical_analysis(instance)
         except Exception as exc:
             logger.exception('Error al clasificar imagen: %s', exc)
 
@@ -145,6 +148,12 @@ def weather_proxy(request):
     if not lat or not lon:
         return Response({'error': 'lat y lon son requeridos'}, status=400)
 
+    try:
+        days = int(request.query_params.get('days', 3))
+    except (TypeError, ValueError):
+        days = 3
+    days = max(1, min(days, 90))
+
     api_key = settings.VISUAL_CROSSING_API_KEY
     if not api_key:
         return Response({'error': 'API key no configurada'}, status=503)
@@ -156,7 +165,7 @@ def weather_proxy(request):
         'elements': 'datetime,precip,humidity,temp,tempmin,tempmax,windspeed',
         'contentType': 'json',
     })
-    url = f'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{lat},{lon}/last3days?{params}'
+    url = f'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{lat},{lon}/last{days}days?{params}'
 
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:

@@ -17,5 +17,9 @@ class EmailVerificationRateThrottle(AnonRateThrottle):
     scope = 'email_verification'
 
 
+class AvailabilityRateThrottle(AnonRateThrottle):
+    scope = 'availability'
+
+
 class AuthenticatedUserThrottle(UserRateThrottle):
     scope = 'authenticated_user'

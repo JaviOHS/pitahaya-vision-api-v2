@@ -18,7 +18,13 @@ from .serializers import (
     EmailVerificationRequestSerializer,
     send_verification_email,
 )
-from .throttles import LoginRateThrottle, RegisterRateThrottle, EmailVerificationRateThrottle
+from .throttles import (
+    LoginRateThrottle,
+    RegisterRateThrottle,
+    EmailVerificationRateThrottle,
+    AvailabilityRateThrottle,
+)
+from .utils import send_notification_email, notify_admins
 from .models import Profile
 from .permissions import IsAdmin
 
@@ -99,10 +105,41 @@ def confirm_verification_email(request):
     serializer = EmailVerificationConfirmSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
+    update_fields = []
     if not user.is_active:
         user.is_active = True
-        user.save(update_fields=['is_active'])
+        update_fields.append('is_active')
+    if not user.email_verified:
+        user.email_verified = True
+        update_fields.append('email_verified')
+    if update_fields:
+        user.save(update_fields=update_fields)
     return Response({'detail': 'Cuenta verificada correctamente.'})
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([AvailabilityRateThrottle])
+def check_availability(request):
+    """Vista para verificar en tiempo real si un dato (username/email/dni/phone) ya está registrado."""
+    field = (request.query_params.get('field') or '').strip().lower()
+    value = (request.query_params.get('value') or '').strip()
+
+    lookups = {
+        'username': lambda v: User.objects.filter(username__iexact=v),
+        'email': lambda v: User.objects.filter(email__iexact=v),
+        'dni': lambda v: User.objects.filter(dni=v),
+        'phone': lambda v: User.objects.filter(phone=v),
+    }
+
+    if field not in lookups or not value:
+        return Response(
+            {'detail': 'Parámetros inválidos. Usa field=username|email|dni|phone y un value no vacío.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    exists = lookups[field](value).exists()
+    return Response({'available': not exists})
 
 
 class CustomerViewSet(ModelViewSet):
@@ -120,6 +157,20 @@ class CustomerViewSet(ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST)
         target.is_active = not target.is_active
         target.save(update_fields=['is_active'])
+        if target.is_active:
+            send_notification_email(
+                target,
+                subject='Tu cuenta fue reactivada · Pitahaya Vision',
+                heading='Cuenta reactivada',
+                message='Un administrador reactivó tu cuenta. Ya puedes iniciar sesión con normalidad.',
+            )
+        else:
+            send_notification_email(
+                target,
+                subject='Tu cuenta fue suspendida · Pitahaya Vision',
+                heading='Cuenta suspendida',
+                message='Un administrador suspendió temporalmente tu cuenta. Ponte en contacto con el administrador para habilitar tu acceso nuevamente.',
+            )
         serializer = self.get_serializer(target)
         return Response(serializer.data)
 
@@ -153,6 +204,16 @@ class CustomRegisterView(RegisterView):
         user = serializer.save(self.request)
         user.is_active = False
         user.save(update_fields=['is_active'])
+        notify_admins(
+            subject='Nuevo usuario registrado · Pitahaya Vision',
+            heading='Nuevo usuario registrado',
+            message=f'"{user.get_full_name() or user.username}" ({user.email}) se registró y está pendiente de verificar su correo.',
+            details=[
+                {'label': 'Usuario', 'value': user.username},
+                {'label': 'Correo', 'value': user.email},
+                {'label': 'Fecha de registro', 'value': user.date_joined.strftime('%d/%m/%Y %H:%M')},
+            ],
+        )
         return user
 
     def create(self, request, *args, **kwargs):

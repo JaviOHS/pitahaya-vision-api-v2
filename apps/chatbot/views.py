@@ -7,6 +7,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.security.permissions import is_admin
+
 from . import client as chatbot_client
 from .models import Context, Conversation, ChatMessage, Farm, PlantHistory, Plot
 from .serializers import (
@@ -82,9 +84,13 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
 class PlantHistoryViewSet(viewsets.ModelViewSet):
     serializer_class = PlantHistorySerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
     def get_queryset(self):
-        return PlantHistory.objects.filter(context__plot__farm__user=self.request.user).select_related('context__plot__farm')
+        qs = PlantHistory.objects.select_related('context__plot__farm')
+        if not is_admin(self.request.user):
+            qs = qs.filter(context__plot__farm__user=self.request.user)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save()
