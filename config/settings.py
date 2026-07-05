@@ -119,9 +119,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 TOKEN_EXPIRY_HOURS = int(os.getenv('TOKEN_EXPIRY_HOURS', '168'))  # 7 días por defecto
 
 # --- Account lockout ---
-MAX_LOGIN_ATTEMPTS = int(os.getenv('MAX_LOGIN_ATTEMPTS', '3'))
+MAX_LOGIN_ATTEMPTS = int(os.getenv('MAX_LOGIN_ATTEMPTS', '6'))
 LOGIN_LOCKOUT_MINUTES = int(os.getenv('LOGIN_LOCKOUT_MINUTES', '3'))
-LOGIN_THROTTLE_RATE = os.getenv('LOGIN_THROTTLE_RATE', '3/3minutes')
+LOGIN_THROTTLE_RATE = os.getenv('LOGIN_THROTTLE_RATE', '3/minute')
 
 # --- DRF ---
 REST_FRAMEWORK = {

@@ -173,8 +173,8 @@ def record_login_attempt(user=None, username='', ip_address=None, user_agent='',
     )
 
     if not successful and user:
-        lockout_minutes = getattr(settings, 'LOGIN_LOCKOUT_MINUTES', 15)
-        max_attempts = getattr(settings, 'MAX_LOGIN_ATTEMPTS', 5)
+        lockout_minutes = settings.LOGIN_LOCKOUT_MINUTES
+        max_attempts = settings.MAX_LOGIN_ATTEMPTS
         cutoff = timezone.now() - timedelta(minutes=lockout_minutes)
         recent_failures = LoginAttempt.objects.filter(
             user=user,
@@ -182,8 +182,10 @@ def record_login_attempt(user=None, username='', ip_address=None, user_agent='',
             timestamp__gte=cutoff,
         ).count()
         if recent_failures >= max_attempts:
-            user.account_locked_until = timezone.now() + timedelta(minutes=lockout_minutes)
-            user.save(update_fields=['account_locked_until'])
+            already_locked = user.account_locked_until and timezone.now() < user.account_locked_until
+            if not already_locked:
+                user.account_locked_until = timezone.now() + timedelta(minutes=lockout_minutes)
+                user.save(update_fields=['account_locked_until'])
 
 
 class PasswordHistoryValidator:

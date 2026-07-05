@@ -178,7 +178,11 @@ class CustomLoginSerializer(LoginSerializer):
 
         if candidate and candidate.is_locked():
             record_login_attempt(candidate, attempted_username, ip, ua, successful=False)
-            raise serializers.ValidationError({'detail': GENERIC_LOGIN_ERROR})
+            remaining = max(int((candidate.account_locked_until - timezone.now()).total_seconds()), 1)
+            raise serializers.ValidationError({
+                'detail': f'Cuenta bloqueada temporalmente. Intenta de nuevo en {remaining} segundos.',
+                'wait': remaining,
+            })
 
         user = None
         if candidate:

@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import serializers
 from rest_framework.test import APIClient
 
@@ -116,7 +116,62 @@ class LoginTests(TestCase):
     def test_login_cuenta_inactiva(self):
         self.user.is_active = False
         self.user.save()
+        self.client.defaults['REMOTE_ADDR'] = '203.0.113.20'
         response = self.client.post('/api/v2/auth/login/', {
             'username': 'login_user', 'password': self.password,
         }, format='json')
         self.assertEqual(response.status_code, 400)
+
+    @override_settings(
+        MAX_LOGIN_ATTEMPTS=6,
+        LOGIN_LOCKOUT_MINUTES=5,
+        REST_FRAMEWORK={
+            'DEFAULT_THROTTLE_RATES': {
+                'anon': '30/hour',
+                'user': '300/hour',
+                'login': '20/minute',
+                'register': '5/hour',
+                'password_reset': '5/hour',
+                'email_verification': '5/minute',
+                'availability': '30/minute',
+                'authenticated_user': '300/hour',
+            }
+        },
+    )
+    def test_login_se_bloquea_después_de_6_intentos_fallidos(self):
+        self.client.defaults['REMOTE_ADDR'] = '203.0.113.30'
+        for attempt in range(6):
+            response = self.client.post('/api/v2/auth/login/', {
+                'username': 'login_user', 'password': 'wrong-password',
+            }, format='json')
+            if response.status_code == 429:
+                break
+            self.assertEqual(response.status_code, 400)
+        locked_user = User.objects.get(pk=self.user.pk)
+        self.assertTrue(locked_user.is_locked())
+        self.assertIsNotNone(locked_user.account_locked_until)
+
+    @override_settings(REST_FRAMEWORK={
+        'DEFAULT_THROTTLE_RATES': {
+            'anon': '30/hour',
+            'user': '300/hour',
+            'login': '3/minute',
+            'register': '5/hour',
+            'password_reset': '5/hour',
+            'email_verification': '5/minute',
+            'availability': '30/minute',
+            'authenticated_user': '300/hour',
+        }
+    })
+    def test_login_throttle_aplica_en_el_4to_intento(self):
+        self.client.defaults['REMOTE_ADDR'] = '203.0.113.11'
+        for _ in range(3):
+            response = self.client.post('/api/v2/auth/login/', {
+                'username': 'login_user', 'password': 'wrong-password',
+            }, format='json')
+            self.assertEqual(response.status_code, 400)
+
+        response = self.client.post('/api/v2/auth/login/', {
+            'username': 'login_user', 'password': 'wrong-password',
+        }, format='json')
+        self.assertEqual(response.status_code, 429)
