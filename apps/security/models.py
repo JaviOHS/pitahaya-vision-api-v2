@@ -95,18 +95,6 @@ class Profile(models.Model):
         default='todas',
         verbose_name='Severidad mínima para notificar por correo',
     )
-    language = models.CharField(
-        max_length=10,
-        choices=[('es', 'Español'), ('en', 'English')],
-        default='es',
-        verbose_name='Idioma',
-    )
-    theme = models.CharField(
-        max_length=10,
-        choices=[('light', 'Claro'), ('dark', 'Oscuro')],
-        default='light',
-        verbose_name='Tema',
-    )
     preferences = models.JSONField(default=dict, blank=True, verbose_name='Preferencias adicionales')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Creado')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Actualizado')

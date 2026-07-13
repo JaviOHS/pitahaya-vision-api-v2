@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.security.models import Profile
 from apps.security.permissions import is_admin
 
 from . import client as chatbot_client
@@ -263,6 +264,121 @@ def _parse_suggestions(raw: str) -> list[str]:
         if line and len(line) > 8:
             cleaned.append(line)
     return cleaned[:3]
+
+
+class ImportBackupView(APIView):
+    """
+    Importa un respaldo completo de plant histories, sesiones y settings.
+    POST /api/v2/chatbot/import-backup/
+    Body: { "data": { "pitahayaVision.plantHistory.v1": [...], "pitahayaVision.sessions.v2": [...], "pitahayaVision.settings.v1": {...} } }
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data.get('data', {})
+        if not isinstance(data, dict):
+            return Response({'error': 'data debe ser un objeto'}, status=status.HTTP_400_BAD_REQUEST)
+
+        resultados = {'settings': False, 'sesiones': 0, 'historiales': 0, 'saltados': 0, 'errores': []}
+
+        # ─── 1. Settings ───
+        settings = data.get('pitahayaVision.settings.v1')
+        if settings and isinstance(settings, dict):
+            try:
+                profile, _ = Profile.objects.get_or_create(user=request.user)
+                for field in ('notifications_enabled', 'notify_severity_threshold'):
+                    if field in settings:
+                        setattr(profile, field, settings[field])
+                profile.save()
+                resultados['settings'] = True
+            except Exception as e:
+                logger.exception('Error importando settings')
+                resultados['errores'].append(f'Settings: {e}')
+
+        # ─── 2. Historiales de planta ───
+        historiales = data.get('pitahayaVision.plantHistory.v1', [])
+        logger.info('Importando %d historiales de planta…', len(historiales))
+
+        for idx, hist in enumerate(historiales):
+            try:
+                cd = hist.get('context_detail') or {}
+                farm_name = (cd.get('farm_name') or cd.get('lotId') or '').strip()
+                plot_name = (cd.get('plot_name') or '').strip()
+                location = (cd.get('location') or '').strip()
+
+                if not farm_name or not plot_name:
+                    resultados['saltados'] += 1
+                    continue
+
+                farm, _ = Farm.objects.get_or_create(
+                    user=request.user,
+                    name=farm_name,
+                    defaults={'location': location},
+                )
+
+                plot, _ = Plot.objects.get_or_create(
+                    farm=farm,
+                    name=plot_name,
+                    defaults={
+                        'zone': (cd.get('zone') or '').strip(),
+                        'rows': str(cd.get('rows') or ''),
+                        'hectares': 0.0,
+                    },
+                )
+
+                plant_key = (cd.get('plant_key_or_id') or '').strip()
+                ctx, _ = Context.objects.get_or_create(
+                    plot=plot,
+                    plant_key_or_id=plant_key,
+                    defaults={
+                        'affected_part': (cd.get('affected_part') or '').strip(),
+                        'main_symptom': (cd.get('main_symptom') or '').strip(),
+                        'status': (cd.get('status') or cd.get('severity') or 'desconocida').strip().lower(),
+                    },
+                )
+
+                # ── Conversación si hay mensajes (sin imágenes) ──
+                messages = hist.get('messages') or []
+                if messages:
+                    conv = Conversation.objects.create(
+                        user=request.user,
+                        context=ctx,
+                        title=(
+                            hist.get('title')
+                            or f'{plant_key or plot_name} — {messages[0].get("created_at", "")[:10]}'
+                        ),
+                    )
+                    for msg in messages:
+                        ChatMessage.objects.create(
+                            conversation=conv,
+                            role=msg.get('role', 'user'),
+                            content=msg.get('content', ''),
+                            image_type='',
+                            image_path='',
+                        )
+                    resultados['sesiones'] += 1
+
+                # ── PlantHistory ──
+                PlantHistory.objects.create(
+                    context=ctx,
+                    final_diagnosis=(hist.get('final_diagnosis') or hist.get('disease_name_predicted') or ''),
+                    treatment_applied=(hist.get('treatment_applied') or hist.get('recommendations_text') or ''),
+                    notes=(hist.get('notes') or hist.get('analysis_text') or ''),
+                )
+                resultados['historiales'] += 1
+
+            except Exception as e:
+                logger.exception('Error en historial #%d', idx)
+                resultados['errores'].append(
+                    f'#{idx} (plant_key={hist.get("plant_key", "?")}): {e}'
+                )
+
+        logger.info(
+            'Import completado: %d historiales, %d sesiones, %d errores',
+            resultados['historiales'], resultados['sesiones'], len(resultados['errores']),
+        )
+        return Response(resultados, status=status.HTTP_200_OK)
 
 
 class SuggestQuestionsView(APIView):

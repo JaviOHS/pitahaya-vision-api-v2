@@ -18,8 +18,8 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'language', 'theme', 'notifications_enabled', 'updated_at')
-    list_filter = ('language', 'theme', 'notifications_enabled')
+    list_display = ('user', 'notifications_enabled', 'updated_at')
+    list_filter = ('notifications_enabled',)
     search_fields = ('user__username', 'user__email')
 
 

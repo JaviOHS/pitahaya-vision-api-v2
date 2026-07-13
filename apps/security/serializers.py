@@ -267,7 +267,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = [
-            'notifications_enabled', 'notify_severity_threshold', 'language', 'theme',
+            'notifications_enabled', 'notify_severity_threshold',
             'preferences', 'created_at', 'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at']
