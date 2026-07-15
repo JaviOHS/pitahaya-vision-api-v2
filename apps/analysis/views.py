@@ -16,6 +16,7 @@ from .models import AnalysisResult
 from .serializers import AnalysisResultSerializer
 from .services import classify_leaf
 from .notifications import notify_analysis_result, notify_admins_of_critical_analysis
+from apps.security.mixins import OwnerFilterMixin
 from apps.security.permissions import is_admin as _is_admin
 from apps.chatbot.models import PlantHistory
 
@@ -57,16 +58,16 @@ def _filter_by_full_name(queryset, query):
     return queryset
 
 
-class AnalysisListCreateView(generics.ListCreateAPIView):
+class AnalysisListCreateView(OwnerFilterMixin, generics.ListCreateAPIView):
     serializer_class = AnalysisResultSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
+    owner_field = 'user'
+    queryset = AnalysisResult.objects.select_related('user').all()
 
     def get_queryset(self):
-        qs = AnalysisResult.objects.select_related('user').all()
-        if not _is_admin(self.request.user):
-            qs = qs.filter(user=self.request.user)
+        qs = super().get_queryset()
 
         params = self.request.query_params
         range_filter = params.get('range', 'all').strip().lower()
@@ -127,17 +128,13 @@ class AnalysisListCreateView(generics.ListCreateAPIView):
                 logger.exception('Error al crear PlantHistory: %s', exc)
 
 
-class AnalysisDetailView(generics.RetrieveUpdateDestroyAPIView):
+class AnalysisDetailView(OwnerFilterMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AnalysisResultSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     http_method_names = ['get', 'patch', 'delete', 'head', 'options']
-
-    def get_queryset(self):
-        qs = AnalysisResult.objects.select_related('user').all()
-        if not _is_admin(self.request.user):
-            qs = qs.filter(user=self.request.user)
-        return qs
+    owner_field = 'user'
+    queryset = AnalysisResult.objects.select_related('user').all()
 
 
 @api_view(['GET'])

@@ -10,10 +10,9 @@ from rest_framework import serializers
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import LoginSerializer, PasswordResetSerializer
 
+from .mixins import UserFieldMixin
 from .models import Profile
 from .utils import (
-    _resolve_role,
-    _resolve_role_label,
     _validate_password_strength,
     email_verification_token_generator,
     record_login_attempt,
@@ -25,13 +24,9 @@ from .utils import (
 User = get_user_model()
 
 
-class CustomUserDetailsSerializer(serializers.ModelSerializer):
+class CustomUserDetailsSerializer(UserFieldMixin, serializers.ModelSerializer):
     profile_photo = serializers.ImageField(required=False, allow_null=True)
-    profile_photo_url = serializers.SerializerMethodField()
-    full_name = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
-    role = serializers.SerializerMethodField()
-    role_label = serializers.SerializerMethodField()
 
     def validate_dni(self, value):
         value = validate_ecuadorian_dni(value)
@@ -66,24 +61,8 @@ class CustomUserDetailsSerializer(serializers.ModelSerializer):
             'role', 'role_label', 'full_name', 'profile_photo_url',
         ]
 
-    def get_profile_photo_url(self, obj):
-        if not obj.profile_photo:
-            return ''
-        request = self.context.get('request')
-        url = obj.profile_photo.url
-        return request.build_absolute_uri(url) if request else url
-
-    def get_full_name(self, obj):
-        return obj.full_name
-
     def get_is_admin(self, obj):
         return bool(obj.is_staff or obj.is_superuser)
-
-    def get_role(self, obj):
-        return _resolve_role(obj)
-
-    def get_role_label(self, obj):
-        return _resolve_role_label(obj)
 
 
 class CustomRegisterSerializer(RegisterSerializer):
@@ -232,12 +211,7 @@ class CustomPasswordResetSerializer(PasswordResetSerializer):
         }
 
 
-class UserSummarySerializer(serializers.ModelSerializer):
-    full_name = serializers.SerializerMethodField()
-    profile_photo_url = serializers.SerializerMethodField()
-    role = serializers.SerializerMethodField()
-    role_label = serializers.SerializerMethodField()
-
+class UserSummarySerializer(UserFieldMixin, serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
@@ -245,22 +219,6 @@ class UserSummarySerializer(serializers.ModelSerializer):
             'phone', 'dni', 'is_active', 'full_name',
             'profile_photo_url', 'role', 'role_label', 'date_joined',
         ]
-
-    def get_full_name(self, obj):
-        return obj.full_name
-
-    def get_profile_photo_url(self, obj):
-        if not obj.profile_photo:
-            return ''
-        request = self.context.get('request')
-        url = obj.profile_photo.url
-        return request.build_absolute_uri(url) if request else url
-
-    def get_role(self, obj):
-        return _resolve_role(obj)
-
-    def get_role_label(self, obj):
-        return _resolve_role_label(obj)
 
 
 class ProfileSerializer(serializers.ModelSerializer):
