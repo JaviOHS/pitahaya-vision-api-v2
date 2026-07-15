@@ -26,6 +26,37 @@ logger = logging.getLogger(__name__)
 # Número de chunks RAG a inyectar en el contexto del modelo
 RAG_TOP_K = 4
 
+# Palabras que indican una consulta general (no específica de un análisis)
+_GENERAL_QUERY_TOKENS = frozenset({
+    'general', 'todos', 'todo', 'historial', 'historial completo',
+    'resumen general', 'todos los analisis', 'todos los análisis',
+    'todos mis resultados', 'all results', 'general info',
+    'informacion general', 'información general', 'todas las plantas',
+    'todos los diagnosticos', 'todos los diagnósticos',
+    'panorama general', 'vision general', 'visión general',
+})
+
+
+def _is_general_query(message: str, farm_context: str) -> bool:
+    """ Detecta si el mensaje pide info general SIN contexto específico. """
+    msg_lower = message.lower().strip()
+    # Si hay contexto agrícola con datos concretos, la consulta es específica
+    if farm_context and any(kw in farm_context.lower() for kw in ('síntoma', 'sintoma', 'parte afectada', 'diagnóstico', 'diagnostico', 'planta')):
+        return False
+    for token in _GENERAL_QUERY_TOKENS:
+        if token in msg_lower:
+            return True
+    return False
+
+
+_GENERAL_QUERY_RESPONSE = (
+    'Para informacion general de todos tus análisis, te recomiendo '
+    'visitar la pagina de Historial en la aplicacion. Ahí puedes encontrar '
+    'análisis detallados, trazabilidad y evolución de tus plantas. '
+    'Si tienes una consulta específica sobre un síntoma, plaga o diagnóstico '
+    'particular, estaré encantado de ayudarte.'
+)
+
 
 class FarmViewSet(CurrentUserCreateMixin, viewsets.ModelViewSet):
     serializer_class = FarmSerializer
@@ -79,7 +110,6 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
 class PlantHistoryViewSet(OwnerFilterMixin, viewsets.ModelViewSet):
     serializer_class = PlantHistorySerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = None
     owner_field = 'context__plot__farm__user'
     queryset = PlantHistory.objects.select_related('context__plot__farm')
 
@@ -118,6 +148,10 @@ class AskChatbotView(APIView):
 
         # 1. Contexto agrícola desde la conversación guardada en DB
         farm_context = self._build_farm_context(conversation_id, request.user)
+
+        # 1.5. Consulta general sin contexto específico → redirigir a Historial
+        if _is_general_query(message, farm_context):
+            return Response({'response': _GENERAL_QUERY_RESPONSE})
 
         # 2. Contexto RAG (omitido cuando no_rag=True, p.ej. comparaciones)
         rag_context = '' if no_rag else _build_rag_context(message)
@@ -225,6 +259,17 @@ class StreamChatbotView(AskChatbotView):
             )
 
         farm_context = self._build_farm_context(conversation_id, request.user)
+
+        if _is_general_query(message, farm_context):
+            def _general_stream():
+                import json as _json
+                yield b"data: " + _json.dumps({'token': _GENERAL_QUERY_RESPONSE, 'done': False}).encode() + b"\n\n"
+                yield b"data: " + _json.dumps({'token': '', 'done': True}).encode() + b"\n\n"
+            response = StreamingHttpResponse(_general_stream(), content_type='text/event-stream')
+            response['Cache-Control'] = 'no-cache'
+            response['X-Accel-Buffering'] = 'no'
+            return response
+
         rag_context = '' if no_rag else _build_rag_context(message)
         full_context = _merge_contexts(farm_context, rag_context)
 

@@ -1,6 +1,10 @@
+import logging
+
 from datetime import timedelta
 
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.utils import timezone
@@ -126,8 +130,8 @@ class CustomRegisterSerializer(RegisterSerializer):
 
         try:
             send_verification_email(user)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error('Error al enviar correo de verificación a %s: %s', user.email, e)
 
 
 GENERIC_LOGIN_ERROR = 'Credenciales inválidas.'

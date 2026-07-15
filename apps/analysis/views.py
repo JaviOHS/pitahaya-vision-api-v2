@@ -62,7 +62,6 @@ class AnalysisListCreateView(OwnerFilterMixin, generics.ListCreateAPIView):
     serializer_class = AnalysisResultSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    pagination_class = None
     owner_field = 'user'
     queryset = AnalysisResult.objects.select_related('user').all()
 
@@ -140,10 +139,16 @@ class AnalysisDetailView(OwnerFilterMixin, generics.RetrieveUpdateDestroyAPIView
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def weather_proxy(request):
-    lat = request.query_params.get('lat', '').strip()
-    lon = request.query_params.get('lon', '').strip()
-    if not lat or not lon:
+    raw_lat = request.query_params.get('lat', '').strip()
+    raw_lon = request.query_params.get('lon', '').strip()
+    if not raw_lat or not raw_lon:
         return Response({'error': 'lat y lon son requeridos'}, status=400)
+
+    try:
+        lat = float(raw_lat)
+        lon = float(raw_lon)
+    except (ValueError, TypeError):
+        return Response({'error': 'lat y lon deben ser numéricos'}, status=400)
 
     try:
         days = int(request.query_params.get('days', 3))

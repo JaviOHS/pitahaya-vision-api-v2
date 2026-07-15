@@ -79,10 +79,13 @@ class ProfilePreferencesView(APIView):
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def delete_account_view(request):
-    """Vista para que los usuarios eliminen su propia cuenta."""
+    """Vista para que los usuarios eliminen su propia cuenta (requiere contraseña)."""
+    password = request.data.get('password', '')
+    if not request.user.check_password(password):
+        return Response({'detail': 'Contraseña incorrecta.'}, status=status.HTTP_403_FORBIDDEN)
     user = request.user
     user.delete()
-    return Response({'detail': 'Cuenta eliminada.'}, status=status.HTTP_204_NO_CONTENT)
+    return Response({'detail': 'Cuenta eliminada.'}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -118,7 +121,7 @@ def confirm_verification_email(request):
 
 
 @api_view(['GET'])
-@permission_classes([permissions.AllowAny])
+@permission_classes([permissions.IsAuthenticated])
 @throttle_classes([AvailabilityRateThrottle])
 def check_availability(request):
     """Vista para verificar en tiempo real si un dato (username/email/dni/phone) ya está registrado."""

@@ -247,9 +247,17 @@ class DeleteAccountTests(TestCase):
         self.client.force_authenticate(user=self.user)
 
     def test_delete_account(self):
-        response = self.client.post('/api/v2/auth/account/delete/', format='json')
-        self.assertEqual(response.status_code, 204)
+        response = self.client.post('/api/v2/auth/account/delete/', {'password': 'Pass1234!'}, format='json')
+        self.assertEqual(response.status_code, 200)
         self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_delete_account_sin_password(self):
+        response = self.client.post('/api/v2/auth/account/delete/', format='json')
+        self.assertEqual(response.status_code, 403)
+
+    def test_delete_account_password_incorrecto(self):
+        response = self.client.post('/api/v2/auth/account/delete/', {'password': 'wrong'}, format='json')
+        self.assertEqual(response.status_code, 403)
 
     def test_delete_account_no_autenticado(self):
         self.client.force_authenticate(user=None)
@@ -352,7 +360,7 @@ class CheckAvailabilityTests(TestCase):
         self.client.force_authenticate(user=None)
         response = self.client.get('/api/v2/auth/availability/',
                                     {'field': 'username', 'value': 'test'})
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 401)
 
     def test_availability_dni(self):
         response = self.client.get('/api/v2/auth/availability/',

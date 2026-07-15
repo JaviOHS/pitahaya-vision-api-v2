@@ -10,9 +10,12 @@ def create_superuser(sender, **kwargs):
         return
 
     User = get_user_model()
-    username = os.getenv('SUPERUSER_USERNAME', 'admin')
-    email = os.getenv('SUPERUSER_EMAIL', 'admin@pitahaya.local')
-    password = os.getenv('SUPERUSER_PASSWORD', 'Admin1234')
+    username = os.getenv('SUPERUSER_USERNAME')
+    email = os.getenv('SUPERUSER_EMAIL')
+    password = os.getenv('SUPERUSER_PASSWORD')
+
+    if not username or not email or not password:
+        return
 
     if not User.objects.filter(username=username).exists():
         User.objects.create_superuser(

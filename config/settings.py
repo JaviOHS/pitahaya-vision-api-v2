@@ -6,7 +6,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env', override=True)
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-me')
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('1', 'true', 'yes')
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('1', 'true', 'yes')
+if not DEBUG and SECRET_KEY == 'django-insecure-change-me':
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured('SECRET_KEY must be changed for production.')
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
