@@ -2,7 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
 
-from .utils import dni_validator, phone_validator
+from .utils import dni_validator, normalize_name, phone_validator
 
 
 class User(AbstractUser):
@@ -23,6 +23,14 @@ class User(AbstractUser):
     last_password_change = models.DateTimeField(blank=True, null=True, verbose_name='Último cambio de contraseña')
     account_locked_until = models.DateTimeField(blank=True, null=True, verbose_name='Bloqueado hasta')
     email_verified = models.BooleanField(default=False, verbose_name='Correo verificado')
+    deactivated_at = models.DateTimeField(blank=True, null=True, verbose_name='Desactivada en')
+
+    def save(self, *args, **kwargs):
+        if self.first_name:
+            self.first_name = normalize_name(self.first_name)
+        if self.last_name:
+            self.last_name = normalize_name(self.last_name)
+        super().save(*args, **kwargs)
 
     class Meta:
         constraints = [

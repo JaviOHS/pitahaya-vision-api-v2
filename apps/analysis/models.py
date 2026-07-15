@@ -1,5 +1,7 @@
 from django.db import models
 
+from apps.security.utils import normalize_name
+
 
 class AnalysisResult(models.Model):
     conversation = models.ForeignKey('chatbot.Conversation', on_delete=models.SET_NULL, null=True, blank=True, related_name='analysis_results')
@@ -18,6 +20,11 @@ class AnalysisResult(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if self.disease_name_predicted:
+            self.disease_name_predicted = normalize_name(self.disease_name_predicted)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.severity} - {self.disease_name_predicted} ({self.created_at:%Y-%m-%d %H:%M})'

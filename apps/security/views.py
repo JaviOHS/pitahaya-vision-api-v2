@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status, permissions
 from rest_framework.decorators import action, api_view, permission_classes, throttle_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -79,13 +80,18 @@ class ProfilePreferencesView(APIView):
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def delete_account_view(request):
-    """Vista para que los usuarios eliminen su propia cuenta (requiere contraseña)."""
+    """Vista para que los usuarios desactiven su propia cuenta (requiere contraseña)."""
     password = request.data.get('password', '')
     if not request.user.check_password(password):
         return Response({'detail': 'Contraseña incorrecta.'}, status=status.HTTP_403_FORBIDDEN)
     user = request.user
-    user.delete()
-    return Response({'detail': 'Cuenta eliminada.'}, status=status.HTTP_200_OK)
+    user.is_active = False
+    user.deactivated_at = timezone.now()
+    user.save(update_fields=['is_active', 'deactivated_at'])
+    return Response(
+        {'detail': 'Cuenta desactivada. Puedes contactar al administrador si deseas reactivarla.'},
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(['POST'])

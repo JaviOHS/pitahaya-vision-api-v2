@@ -1,3 +1,5 @@
+import re
+
 from datetime import timedelta
 
 from django.conf import settings
@@ -22,6 +24,14 @@ phone_validator = RegexValidator(
     regex=r'^0\d{9}$',
     message='El teléfono debe tener 10 dígitos y comenzar con 0.',
 )
+
+
+def normalize_name(value: str) -> str:
+    """Capitaliza la primera letra de cada palabra, el resto en minúsculas."""
+    value = (value or '').strip()
+    if not value:
+        return value
+    return ' '.join(w.capitalize() for w in value.split())
 
 
 EMAIL_VERIFICATION_TIMEOUT = 86400  # 1 día en segundos

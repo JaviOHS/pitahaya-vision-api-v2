@@ -249,7 +249,9 @@ class DeleteAccountTests(TestCase):
     def test_delete_account(self):
         response = self.client.post('/api/v2/auth/account/delete/', {'password': 'Pass1234!'}, format='json')
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_active)
+        self.assertIsNotNone(self.user.deactivated_at)
 
     def test_delete_account_sin_password(self):
         response = self.client.post('/api/v2/auth/account/delete/', format='json')
