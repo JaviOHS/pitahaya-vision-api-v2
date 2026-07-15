@@ -5,11 +5,23 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import PasswordResetTokenGenerator, default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
+from django.core.validators import RegexValidator
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import serializers
+
+
+dni_validator = RegexValidator(
+    regex=r'^\d{10}$',
+    message='La cédula debe tener exactamente 10 dígitos.',
+)
+
+phone_validator = RegexValidator(
+    regex=r'^0\d{9}$',
+    message='El teléfono debe tener 10 dígitos y comenzar con 0.',
+)
 
 
 EMAIL_VERIFICATION_TIMEOUT = 86400  # 1 día en segundos

@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from django.apps import AppConfig
 
@@ -11,6 +12,8 @@ class RagConfig(AppConfig):
     verbose_name = 'RAG'
 
     def ready(self):
+        if 'runserver' not in sys.argv:
+            return
         from .embedder import _get_model
         logger.info('Precargando modelo de embeddings RAG…')
         _get_model()

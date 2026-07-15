@@ -1,18 +1,8 @@
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
-
-dni_validator = RegexValidator(
-    regex=r'^\d{10}$',
-    message='La cédula debe tener exactamente 10 dígitos.',
-)
-
-phone_validator = RegexValidator(
-    regex=r'^0\d{9}$',
-    message='El teléfono debe tener 10 dígitos y comenzar con 0.',
-)
+from .utils import dni_validator, phone_validator
 
 
 class User(AbstractUser):
