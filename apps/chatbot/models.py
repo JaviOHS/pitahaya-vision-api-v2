@@ -23,6 +23,9 @@ class Farm(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        ordering = ['name']
+
 
 class Plot(models.Model):
     farm = models.ForeignKey(Farm, on_delete=models.CASCADE, related_name='plots')
@@ -103,4 +106,7 @@ class PlantHistory(models.Model):
         plant = ctx.plant_key_or_id if ctx else '?'
         plot_name = ctx.plot if ctx else '?'
         return f'Historial de planta {plant} en {plot_name}'
+
+    class Meta:
+        ordering = ['-created_at']
     
