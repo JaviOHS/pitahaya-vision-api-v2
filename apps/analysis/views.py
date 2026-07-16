@@ -5,6 +5,7 @@ import json as _json
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import generics, permissions
@@ -156,6 +157,11 @@ def weather_proxy(request):
         days = 3
     days = max(1, min(days, 90))
 
+    cache_key = f'weather_{lat}_{lon}_{days}'
+    cached = cache.get(cache_key)
+    if cached:
+        return Response(cached)
+
     api_key = settings.VISUAL_CROSSING_API_KEY
     if not api_key:
         return Response({'error': 'API key no configurada'}, status=503)
@@ -209,7 +215,7 @@ def weather_proxy(request):
         for d in days
     ]
 
-    return Response({
+    result = {
         'totalPrecip': round(total_precip, 1),
         'avgHumidity': round(avg_humidity),
         'avgTemp':     round(avg_temp, 1),
@@ -218,4 +224,6 @@ def weather_proxy(request):
         'avgWind':     round(avg_wind, 1),
         'condition':   condition,
         'days':        days_out,
-    })
+    }
+    cache.set(cache_key, result, 60 * 60)
+    return Response(result)

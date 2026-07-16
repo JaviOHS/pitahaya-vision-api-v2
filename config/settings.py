@@ -146,14 +146,14 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '30/hour',
-        'user': '300/hour',
+        'anon': '60/hour',
+        'user': '2000/hour',
         'login': LOGIN_THROTTLE_RATE,
-        'register': '5/hour',
-        'password_reset': '5/hour',
-        'email_verification': '5/minute',
-        'availability': '30/minute',
-        'authenticated_user': '300/hour',
+        'register': '10/hour',
+        'password_reset': '10/hour',
+        'email_verification': '10/minute',
+        'availability': '60/minute',
+        'authenticated_user': '3000/hour',
     },
 }
 
