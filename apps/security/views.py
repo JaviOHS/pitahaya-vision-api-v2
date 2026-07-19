@@ -127,7 +127,7 @@ def confirm_verification_email(request):
 
 
 @api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.AllowAny])
 @throttle_classes([AvailabilityRateThrottle])
 def check_availability(request):
     """Vista para verificar en tiempo real si un dato (username/email/dni/phone) ya está registrado."""

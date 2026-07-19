@@ -1,4 +1,7 @@
 import json
+import os
+import shutil
+import tempfile
 
 import requests
 from unittest.mock import MagicMock, patch
@@ -440,6 +443,143 @@ class ImportBackupViewTests(ChatbotViewsBase):
         response = self.client.post('/api/v2/chatbot/import-backup/',
                                      {'data': 'invalido'}, format='json')
         self.assertEqual(response.status_code, 400)
+
+
+class ImportBackupFullRestoreTests(ChatbotViewsBase):
+    """Restauración completa: el import debe recrear el AnalysisResult (Historial) e imagen."""
+
+    def setUp(self):
+        super().setUp()
+        self.media_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.media_dir, ignore_errors=True)
+
+    def test_import_recrea_analysis_result_vinculado_al_historial(self):
+        data = {
+            'data': {
+                'pitahayaVision.plantHistory.v1': [{
+                    'context_detail': {
+                        'farm_name': 'Finca Restore', 'plot_name': 'Parcela Restore',
+                        'plant_key_or_id': 'P900',
+                    },
+                    'disease_name_predicted': 'Antracnosis',
+                    'severity': 'alta',
+                    'confidence_percent': 82,
+                    'final_diagnosis': 'Antracnosis',
+                    'treatment_applied': 'Fungicida',
+                }],
+            },
+        }
+        response = self.client.post('/api/v2/chatbot/import-backup/', data, format='json')
+        self.assertEqual(response.status_code, 200)
+        analysis = AnalysisResult.objects.get(user=self.user, disease_name_predicted='Antracnosis')
+        self.assertAlmostEqual(analysis.confidence, 0.82)
+        ph = PlantHistory.objects.get(analysis_result=analysis)
+        self.assertEqual(ph.final_diagnosis, 'Antracnosis')
+
+    @override_settings(MEDIA_URL='/media/')
+    def test_import_restaura_imagen_desde_media_root_local(self):
+        with override_settings(MEDIA_ROOT=self.media_dir):
+            rel = 'leaf_uploads/2026/06/18/test_leaf.jpg'
+            abs_path = os.path.join(self.media_dir, rel)
+            os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+            with open(abs_path, 'wb') as fh:
+                fh.write(b'fake-image-bytes')
+
+            data = {
+                'data': {
+                    'pitahayaVision.plantHistory.v1': [{
+                        'context_detail': {'farm_name': 'Finca Img', 'plot_name': 'Parcela Img'},
+                        'disease_name_predicted': 'Roya',
+                        'image_url': f'http://testserver/media/{rel}',
+                    }],
+                },
+            }
+            response = self.client.post('/api/v2/chatbot/import-backup/', data, format='json')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['imagenes'], 1)
+            analysis = AnalysisResult.objects.get(user=self.user, disease_name_predicted='Roya')
+            self.assertTrue(analysis.image_path.name)
+
+    @override_settings(MEDIA_URL='/media/')
+    def test_import_bloquea_path_traversal_en_imagen(self):
+        with override_settings(MEDIA_ROOT=self.media_dir):
+            data = {
+                'data': {
+                    'pitahayaVision.plantHistory.v1': [{
+                        'context_detail': {'farm_name': 'Finca Trav', 'plot_name': 'Parcela Trav'},
+                        'disease_name_predicted': 'Malicioso',
+                        'image_url': 'http://testserver/media/../../../../etc/passwd',
+                    }],
+                },
+            }
+            response = self.client.post('/api/v2/chatbot/import-backup/', data, format='json')
+            self.assertEqual(response.status_code, 200)
+            analysis = AnalysisResult.objects.get(user=self.user, disease_name_predicted='Malicioso')
+            self.assertFalse(analysis.image_path)
+
+
+class ExportBackupViewTests(ChatbotViewsBase):
+    def setUp(self):
+        super().setUp()
+        self.analysis = AnalysisResult.objects.create(
+            user=self.user, conversation=self.conv,
+            disease_name_predicted='Roya', severity='alta', confidence=0.8,
+        )
+        PlantHistory.objects.create(
+            context=self.ctx, analysis_result=self.analysis,
+            final_diagnosis='Roya', treatment_applied='Fungicida',
+        )
+
+    def test_export_no_autenticado_rechaza(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get('/api/v2/chatbot/export-backup/')
+        self.assertEqual(response.status_code, 401)
+
+    def test_export_estructura_respuesta(self):
+        response = self.client.get('/api/v2/chatbot/export-backup/')
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body['role'], 'usuario')
+        historiales = body['data']['pitahayaVision.plantHistory.v1']
+        self.assertEqual(len(historiales), 1)
+        hist = historiales[0]
+        self.assertEqual(hist['final_diagnosis'], 'Roya')
+        self.assertEqual(hist['treatment_applied'], 'Fungicida')
+        self.assertEqual(hist['context_detail']['farm_name'], 'Finca Test')
+        self.assertNotIn('owner_name', hist)
+        self.assertIn('pitahayaVision.settings.v1', body['data'])
+
+    def test_export_solo_datos_propios(self):
+        otro = User.objects.create_user(username='otro_export', password='Pass1234!')
+        AnalysisResult.objects.create(user=otro, disease_name_predicted='Otra')
+        response = self.client.get('/api/v2/chatbot/export-backup/')
+        historiales = response.json()['data']['pitahayaVision.plantHistory.v1']
+        self.assertEqual(len(historiales), 1)
+
+    def test_export_admin_ve_todos_los_usuarios(self):
+        otro = User.objects.create_user(username='otro_export2', password='Pass1234!')
+        AnalysisResult.objects.create(user=otro, disease_name_predicted='Otra')
+        admin = User.objects.create_superuser(
+            username='admin_export', email='admin_export@test.com', password='Admin1234!',
+        )
+        self.client.force_authenticate(user=admin)
+        response = self.client.get('/api/v2/chatbot/export-backup/')
+        body = response.json()
+        self.assertEqual(body['role'], 'administrador')
+        historiales = body['data']['pitahayaVision.plantHistory.v1']
+        self.assertEqual(len(historiales), 2)
+        self.assertTrue(all('owner_name' in h for h in historiales))
+
+    def test_export_filtra_por_rango_de_fechas(self):
+        viejo = AnalysisResult.objects.create(user=self.user, disease_name_predicted='Vieja')
+        AnalysisResult.objects.filter(pk=viejo.pk).update(created_at='2020-01-01T00:00:00Z')
+        response = self.client.get('/api/v2/chatbot/export-backup/', {'date_from': '2024-01-01'})
+        historiales = response.json()['data']['pitahayaVision.plantHistory.v1']
+        diagnosticos = [h['disease_name_predicted'] for h in historiales]
+        self.assertIn('Roya', diagnosticos)
+        self.assertNotIn('Vieja', diagnosticos)
 
 
 class ChatbotClientTests(TestCase):

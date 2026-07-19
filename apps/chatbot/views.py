@@ -1,14 +1,23 @@
 import logging
+import os
 import re
+from urllib.parse import unquote, urlparse
 
+from django.conf import settings
+from django.core.files.base import ContentFile
 from django.http import StreamingHttpResponse
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.analysis.models import AnalysisResult
+from apps.analysis.serializers import AnalysisResultSerializer
+from apps.analysis.views import _filter_by_range
 from apps.security.models import Profile
 from apps.security.mixins import CurrentUserCreateMixin, OwnerFilterMixin
+from apps.security.permissions import is_admin
 
 from . import client as chatbot_client
 from .models import Context, Conversation, ChatMessage, Farm, PlantHistory, Plot
@@ -301,11 +310,153 @@ def _parse_suggestions(raw: str) -> list[str]:
     return cleaned[:3]
 
 
+class ExportBackupView(APIView):
+    """
+    Genera un respaldo con los datos ACTUALES del usuario autenticado.
+    - Administradores: incluye los análisis/historiales de TODOS los usuarios.
+    - Usuarios normales: incluye únicamente los suyos.
+    Admite filtrar por rango de fechas sobre la fecha del análisis.
+
+    GET /api/v2/chatbot/export-backup/?range=today|last7|month&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        params = request.query_params
+        range_filter = params.get('range', '').strip().lower()
+        date_from = params.get('date_from', '').strip()
+        date_to = params.get('date_to', '').strip()
+
+        admin = is_admin(request.user)
+
+        analyses_qs = AnalysisResult.objects.select_related(
+            'user', 'conversation__context__plot__farm',
+        ).prefetch_related('conversation__messages')
+        if not admin:
+            analyses_qs = analyses_qs.filter(user=request.user)
+        analyses_qs = _filter_by_range(analyses_qs, range_filter, date_from, date_to).order_by('-created_at')
+
+        analyses = list(analyses_qs)
+        plant_histories_by_ar = {}
+        ar_ids = [ar.id for ar in analyses]
+        for ph in PlantHistory.objects.filter(analysis_result_id__in=ar_ids):
+            plant_histories_by_ar.setdefault(ph.analysis_result_id, ph)
+
+        historiales = [
+            self._build_entry(ar, plant_histories_by_ar.get(ar.id), request, admin)
+            for ar in analyses
+        ]
+
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        settings_payload = {
+            'notifications_enabled': profile.notifications_enabled,
+            'notify_severity_threshold': profile.notify_severity_threshold,
+        }
+
+        payload = {
+            'exportedAt': timezone.now().isoformat(),
+            'role': 'administrador' if admin else 'usuario',
+            'dateFrom': date_from or None,
+            'dateTo': date_to or None,
+            'totalRegistros': len(historiales),
+            'data': {
+                'pitahayaVision.plantHistory.v1': historiales,
+                'pitahayaVision.settings.v1': settings_payload,
+            },
+        }
+        return Response(payload)
+
+    @staticmethod
+    def _build_entry(ar, plant_history, request, admin):
+        ar_data = AnalysisResultSerializer(ar, context={'request': request}).data
+        conv = ar.conversation
+        ctx = conv.context if conv else None
+        plot = ctx.plot if ctx and ctx.plot_id else None
+        farm = plot.farm if plot and plot.farm_id else None
+
+        context_detail = None
+        if ctx:
+            context_detail = {
+                'id': ctx.id,
+                'plant_key_or_id': ctx.plant_key_or_id or '',
+                'affected_part': ctx.affected_part or '',
+                'main_symptom': ctx.main_symptom or '',
+                'status': ctx.status or '',
+                'farm_name': farm.name if farm else '',
+                'farm_id': farm.id if farm else None,
+                'plot_id': plot.id if plot else None,
+                'plot_name': plot.name if plot else '',
+                'zone': plot.zone if plot else '',
+                'rows': plot.rows if plot else '',
+                'location': plot.gps_location if plot else '',
+                'created_at': ctx.created_at.isoformat() if ctx.created_at else '',
+            }
+
+        messages = []
+        if conv:
+            messages = [
+                {'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()}
+                for m in sorted(conv.messages.all(), key=lambda m: m.created_at)
+            ]
+
+        entry = {
+            'id': ar.id,
+            'plant_key': f'{ctx.plant_key_or_id}|{ctx.plot_id}' if ctx else '',
+            'created_at': ar_data['created_at'],
+            'title': conv.title if conv else '',
+            'final_diagnosis': (plant_history.final_diagnosis if plant_history else '') or ar_data['disease_name_predicted'],
+            'disease_name_predicted': ar_data['disease_name_predicted'],
+            'treatment_applied': (plant_history.treatment_applied if plant_history else '') or ar_data['recommendations_text'],
+            'recommendations_text': ar_data['recommendations_text'],
+            'notes': (plant_history.notes if plant_history else '') or ar_data['analysis_text'],
+            'analysis_text': ar_data['analysis_text'],
+            'severity': ar_data['severity'],
+            'confidence_percent': ar_data['confidence_percent'],
+            'probability': ar_data['probability'],
+            'latitude': ar_data['latitude'],
+            'longitude': ar_data['longitude'],
+            'image_url': ar_data['image_url'],
+            'context_detail': context_detail,
+            'messages': messages,
+        }
+        if admin:
+            entry['owner_name'] = ar_data['owner_name']
+            entry['owner_email'] = ar_data['owner_email']
+        return entry
+
+
+def _fetch_image_content(image_url, request):
+    """
+    Recupera los bytes de una imagen de análisis a partir de su URL, siempre que
+    viva en el MEDIA_ROOT de este mismo servidor (caso normal: exportar e importar
+    dentro del mismo despliegue). No se hacen fetches HTTP a hosts externos para
+    evitar SSRF con URLs arbitrarias provistas por el archivo de respaldo.
+    Devuelve (contenido_bytes, nombre_archivo) o (None, None) si no se pudo obtener.
+    """
+    parsed = urlparse(image_url)
+    media_url_path = urlparse(settings.MEDIA_URL).path if settings.MEDIA_URL else '/media/'
+    same_host = not parsed.netloc or parsed.netloc == request.get_host()
+    if not same_host or media_url_path not in parsed.path:
+        return None, None
+
+    rel_path = unquote(parsed.path.split(media_url_path, 1)[-1].lstrip('/'))
+    media_root = os.path.abspath(str(settings.MEDIA_ROOT))
+    abs_path = os.path.abspath(os.path.join(media_root, rel_path))
+    if abs_path != media_root and not abs_path.startswith(media_root + os.sep):
+        return None, None  # fuera de MEDIA_ROOT — intento de path traversal
+    if not os.path.isfile(abs_path):
+        return None, None
+
+    with open(abs_path, 'rb') as fh:
+        return fh.read(), os.path.basename(abs_path)
+
+
 class ImportBackupView(APIView):
     """
-    Importa un respaldo completo de plant histories, sesiones y settings.
+    Importa un respaldo completo de plant histories, sesiones, análisis (con imagen) y settings.
     POST /api/v2/chatbot/import-backup/
-    Body: { "data": { "pitahayaVision.plantHistory.v1": [...], "pitahayaVision.sessions.v2": [...], "pitahayaVision.settings.v1": {...} } }
+    Body: { "data": { "pitahayaVision.plantHistory.v1": [...], "pitahayaVision.settings.v1": {...} } }
     """
 
     permission_classes = [IsAuthenticated]
@@ -315,7 +466,7 @@ class ImportBackupView(APIView):
         if not isinstance(data, dict):
             return Response({'error': 'data debe ser un objeto'}, status=status.HTTP_400_BAD_REQUEST)
 
-        resultados = {'settings': False, 'sesiones': 0, 'historiales': 0, 'saltados': 0, 'errores': []}
+        resultados = {'settings': False, 'sesiones': 0, 'historiales': 0, 'imagenes': 0, 'saltados': 0, 'errores': []}
 
         # ─── 1. Settings ───
         settings = data.get('pitahayaVision.settings.v1')
@@ -373,8 +524,9 @@ class ImportBackupView(APIView):
                     },
                 )
 
-                # ── Conversación si hay mensajes (sin imágenes) ──
+                # ── Conversación si hay mensajes ──
                 messages = hist.get('messages') or []
+                conv = None
                 if messages:
                     conv = Conversation.objects.create(
                         user=request.user,
@@ -394,13 +546,48 @@ class ImportBackupView(APIView):
                         )
                     resultados['sesiones'] += 1
 
+                # ── AnalysisResult (alimenta el Historial) ──
+                analysis = None
+                if hist.get('disease_name_predicted') or hist.get('severity') or hist.get('image_url'):
+                    confidence_percent = hist.get('confidence_percent') or 0
+                    analysis = AnalysisResult.objects.create(
+                        user=request.user,
+                        conversation=conv,
+                        disease_name_predicted=(hist.get('disease_name_predicted') or hist.get('final_diagnosis') or ''),
+                        confidence=float(confidence_percent) / 100.0,
+                        probability=float(hist.get('probability') or 0.0),
+                        severity=(hist.get('severity') or cd.get('status') or 'desconocida'),
+                        analysis_text=(hist.get('analysis_text') or hist.get('notes') or ''),
+                        recommendations_text=(hist.get('recommendations_text') or hist.get('treatment_applied') or ''),
+                        latitude=hist.get('latitude'),
+                        longitude=hist.get('longitude'),
+                    )
+                    if hist.get('created_at'):
+                        AnalysisResult.objects.filter(pk=analysis.pk).update(created_at=hist['created_at'])
+
+                    image_url = hist.get('image_url')
+                    if image_url:
+                        try:
+                            content, filename = _fetch_image_content(image_url, request)
+                            if content:
+                                analysis.image_path.save(filename, ContentFile(content), save=True)
+                                resultados['imagenes'] += 1
+                            else:
+                                resultados['errores'].append(f'#{idx}: imagen no encontrada en el origen')
+                        except Exception as e:
+                            logger.exception('Error descargando imagen del historial #%d', idx)
+                            resultados['errores'].append(f'#{idx}: no se pudo descargar la imagen ({e})')
+
                 # ── PlantHistory ──
-                PlantHistory.objects.create(
+                ph = PlantHistory.objects.create(
                     context=ctx,
+                    analysis_result=analysis,
                     final_diagnosis=(hist.get('final_diagnosis') or hist.get('disease_name_predicted') or ''),
                     treatment_applied=(hist.get('treatment_applied') or hist.get('recommendations_text') or ''),
                     notes=(hist.get('notes') or hist.get('analysis_text') or ''),
                 )
+                if hist.get('created_at'):
+                    PlantHistory.objects.filter(pk=ph.pk).update(created_at=hist['created_at'])
                 resultados['historiales'] += 1
 
             except Exception as e:
@@ -418,8 +605,10 @@ class ImportBackupView(APIView):
 
 class SuggestQuestionsView(APIView):
     """
-    Genera 3 preguntas de seguimiento basadas en la última respuesta del bot.
-    NO usa RAG ni contexto agrícola — solo Gemma interpreta la respuesta.
+    Genera 3 preguntas de seguimiento basadas en el conjunto de respuestas
+    generadas para el análisis actual (diagnóstico del modelo, explicación de
+    Gemma, plan de tratamiento y comparación con análisis previo si existe).
+    NO usa RAG ni contexto agrícola — solo Gemma interpreta el texto recibido.
 
     POST /api/v2/chatbot/suggest/
     Body: { "bot_response": "..." }
@@ -433,8 +622,10 @@ class SuggestQuestionsView(APIView):
             return Response({'suggestions': []})
 
         prompt = (
-            'Basándote en la siguiente respuesta sobre pitahaya:\n\n'
-            f'"""\n{bot_response[:900]}\n"""\n\n'
+            'Basándote en la siguiente información sobre un análisis de pitahaya '
+            '(puede incluir diagnóstico, explicación, plan de tratamiento y '
+            'comparación con un análisis previo):\n\n'
+            f'"""\n{bot_response[:1600]}\n"""\n\n'
             'Genera exactamente 3 preguntas cortas (máximo 10 palabras cada una) '
             'que el agricultor podría querer preguntar a continuación.\n'
             'IMPORTANTE: Responde ÚNICAMENTE con las 3 preguntas, una por línea, '

@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AskChatbotView,
+    ExportBackupView,
     ImportBackupView,
     StreamChatbotView,
     SuggestQuestionsView,
@@ -30,4 +31,5 @@ urlpatterns = [
     path('suggest/', SuggestQuestionsView.as_view(), name='chatbot-suggest'),
     path('heatmap-analysis/', HeatmapAnalysisView.as_view(), name='chatbot-heatmap-analysis'),
     path('import-backup/', ImportBackupView.as_view(), name='chatbot-import-backup'),
+    path('export-backup/', ExportBackupView.as_view(), name='chatbot-export-backup'),
 ]
