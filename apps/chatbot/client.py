@@ -43,14 +43,23 @@ def chat(message: str, context: str = '', max_length: int = 384) -> str:
         return 'Ocurrió un error al consultar el asistente.'
 
 
+def _sse_token(text: str) -> bytes:
+    return b"data: " + json.dumps({'token': text, 'done': False}).encode() + b"\n\n"
+
+def _sse_done() -> bytes:
+    return b"data: " + json.dumps({'token': '', 'done': True}).encode() + b"\n\n"
+
+
 def chat_stream(message: str, context: str = '', max_length: int = 250):
     """
     Generador que hace proxy del streaming SSE desde el servicio Colab.
     Produce chunks de bytes crudos (formato SSE) listos para StreamingHttpResponse.
+    Si el streaming falla (timeout / conexión), hace fallback automático al
+    endpoint síncrono /chat para no dejar al usuario esperando 120s.
     """
     if not SERVICE_URL:
-        yield b"data: " + json.dumps({'token': 'El servicio de chatbot no está configurado.', 'done': False}).encode() + b"\n\n"
-        yield b"data: " + json.dumps({'token': '', 'done': True}).encode() + b"\n\n"
+        yield _sse_token('El servicio de chatbot no está configurado.')
+        yield _sse_done()
         return
 
     url = f'{SERVICE_URL}/chat/stream'
@@ -67,9 +76,14 @@ def chat_stream(message: str, context: str = '', max_length: int = 250):
                 if chunk:
                     yield chunk
     except requests.exceptions.RequestException as exc:
-        logger.exception('Error en chat_stream: %s', exc)
-        yield b"data: " + json.dumps({'token': 'No se pudo conectar con el asistente.', 'done': False}).encode() + b"\n\n"
-        yield b"data: " + json.dumps({'token': '', 'done': True}).encode() + b"\n\n"
+        logger.warning('chat_stream falló (%s), fallback a /chat síncrono', exc)
+        try:
+            texto = chat(message, context, max_length)
+            yield _sse_token(texto)
+        except Exception as exc2:
+            logger.exception('Fallback síncrono también falló: %s', exc2)
+            yield _sse_token('No se pudo conectar con el asistente.')
+        yield _sse_done()
 
 
 def health() -> dict:
