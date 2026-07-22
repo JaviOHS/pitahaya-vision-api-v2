@@ -123,6 +123,14 @@ class PlantHistoryViewSet(OwnerFilterMixin, viewsets.ModelViewSet):
     owner_field = 'context__plot__farm__user'
     queryset = PlantHistory.objects.select_related('context__plot__farm')
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        range_filter = params.get('range', 'all').strip().lower()
+        date_from = params.get('date_from', '').strip()
+        date_to = params.get('date_to', '').strip()
+        return _filter_by_range(qs, range_filter, date_from, date_to)
+
     def perform_create(self, serializer):
         serializer.save()
 
