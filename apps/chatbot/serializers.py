@@ -8,6 +8,12 @@ class PlotSerializer(serializers.ModelSerializer):
         fields = ['id', 'farm', 'name', 'hectares', 'gps_location', 'zone', 'rows']
         read_only_fields = ['id']
 
+    def validate_farm(self, value):
+        request = self.context.get('request')
+        if value and request and value.user_id != request.user.pk:
+            raise serializers.ValidationError('Esta finca no existe o no te pertenece.')
+        return value
+
 
 class FarmSerializer(serializers.ModelSerializer):
     plots = PlotSerializer(many=True, read_only=True)
@@ -24,12 +30,24 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         fields = ['id', 'conversation', 'role', 'content', 'image_type', 'image_path', 'created_at']
         read_only_fields = ['id', 'created_at']
 
+    def validate_conversation(self, value):
+        request = self.context.get('request')
+        if value and request and value.user_id != request.user.pk:
+            raise serializers.ValidationError('Esta conversación no existe o no te pertenece.')
+        return value
+
 
 class ContextSerializer(serializers.ModelSerializer):
     class Meta:
         model = Context
         fields = '__all__'
         read_only_fields = ['id', 'created_at']
+
+    def validate_plot(self, value):
+        request = self.context.get('request')
+        if value and request and value.farm.user_id != request.user.pk:
+            raise serializers.ValidationError('Esta parcela no existe o no te pertenece.')
+        return value
 
 
 class PlantHistorySerializer(serializers.ModelSerializer):
@@ -94,3 +112,9 @@ class ConversationSerializer(serializers.ModelSerializer):
         model = Conversation
         fields = ['id', 'user', 'context', 'title', 'created_at', 'updated_at', 'messages']
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+
+    def validate_context(self, value):
+        request = self.context.get('request')
+        if value and request and value.plot.farm.user_id != request.user.pk:
+            raise serializers.ValidationError('Este contexto no existe o no te pertenece.')
+        return value

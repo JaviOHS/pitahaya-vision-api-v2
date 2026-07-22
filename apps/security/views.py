@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from dj_rest_auth.registration.views import RegisterView
 from dj_rest_auth.views import LoginView as RestLoginView
+from dj_rest_auth.views import PasswordResetView as RestPasswordResetView
 
 from .serializers import (
     CustomUserDetailsSerializer,
@@ -22,6 +23,7 @@ from .serializers import (
 from .throttles import (
     LoginRateThrottle,
     RegisterRateThrottle,
+    PasswordResetRateThrottle,
     EmailVerificationRateThrottle,
     AvailabilityRateThrottle,
 )
@@ -158,6 +160,12 @@ class CustomerViewSet(ModelViewSet):
     queryset = User.objects.order_by('-date_joined')
     serializer_class = UserSummarySerializer
 
+    def create(self, request, *args, **kwargs):
+        # Las cuentas se crean únicamente vía registro público (con contraseña
+        # y verificación de correo); este endpoint es solo para gestionar
+        # cuentas existentes (listar, activar/desactivar, cambiar rol).
+        return Response({'detail': 'Método no permitido.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
     @action(detail=True, methods=['post'])
     def toggle_active(self, request, pk=None):
         target = self.get_object()
@@ -203,6 +211,10 @@ class CustomerViewSet(ModelViewSet):
 
 class CustomLoginView(RestLoginView):
     throttle_classes = [LoginRateThrottle]
+
+
+class CustomPasswordResetView(RestPasswordResetView):
+    throttle_classes = [PasswordResetRateThrottle]
 
 
 class CustomRegisterView(RegisterView):

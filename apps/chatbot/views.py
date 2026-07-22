@@ -5,6 +5,7 @@ from urllib.parse import unquote, urlparse
 
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.db import transaction
 from django.http import StreamingHttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -144,10 +145,7 @@ class AskChatbotView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        message = request.data.get('message', '').strip()
-        conversation_id = request.data.get('conversation_id')
-        max_length = int(request.data.get('max_length', 1024))
-        no_rag = bool(request.data.get('no_rag', False))
+        message, conversation_id, max_length, no_rag = self._parse_chat_request(request, 1024)
 
         if not message:
             return Response(
@@ -187,6 +185,17 @@ class AskChatbotView(APIView):
     # ------------------------------------------------------------------
     # Helpers privados
     # ------------------------------------------------------------------
+
+    def _parse_chat_request(self, request, default_max_length):
+        """Extrae y normaliza los campos comunes del body de /chat y /chat/stream."""
+        message = request.data.get('message', '').strip()
+        conversation_id = request.data.get('conversation_id')
+        try:
+            max_length = int(request.data.get('max_length', default_max_length))
+        except (TypeError, ValueError):
+            max_length = default_max_length
+        no_rag = bool(request.data.get('no_rag', False))
+        return message, conversation_id, max_length, no_rag
 
     def _build_farm_context(self, conversation_id, user) -> str:
         """Construye texto con los datos agrícolas de la conversación activa."""
@@ -256,10 +265,7 @@ class StreamChatbotView(AskChatbotView):
     """
 
     def post(self, request):
-        message = request.data.get('message', '').strip()
-        conversation_id = request.data.get('conversation_id')
-        max_length = int(request.data.get('max_length', 250))
-        no_rag = bool(request.data.get('no_rag', False))
+        message, conversation_id, max_length, no_rag = self._parse_chat_request(request, 250)
 
         if not message:
             return Response(
@@ -452,6 +458,117 @@ def _fetch_image_content(image_url, request):
         return fh.read(), os.path.basename(abs_path)
 
 
+@transaction.atomic
+def _import_plant_history_record(request, hist, idx, resultados):
+    """
+    Importa un registro de historial de planta (finca/parcela/contexto +
+    conversación + análisis). Todo o nada: si algo falla a mitad de camino,
+    las filas ya creadas para ESTE registro se revierten en vez de quedar
+    huérfanas (los registros ya importados antes de este no se ven afectados).
+    """
+    cd = hist.get('context_detail') or {}
+    farm_name = (cd.get('farm_name') or cd.get('lotId') or '').strip()
+    plot_name = (cd.get('plot_name') or '').strip()
+    location = (cd.get('location') or '').strip()
+
+    if not farm_name or not plot_name:
+        resultados['saltados'] += 1
+        return
+
+    farm, _ = Farm.objects.get_or_create(
+        user=request.user,
+        name=farm_name,
+        defaults={'location': location},
+    )
+
+    plot, _ = Plot.objects.get_or_create(
+        farm=farm,
+        name=plot_name,
+        defaults={
+            'zone': (cd.get('zone') or '').strip(),
+            'rows': str(cd.get('rows') or ''),
+            'hectares': 0.0,
+        },
+    )
+
+    plant_key = (cd.get('plant_key_or_id') or '').strip()
+    ctx, _ = Context.objects.get_or_create(
+        plot=plot,
+        plant_key_or_id=plant_key,
+        defaults={
+            'affected_part': (cd.get('affected_part') or '').strip(),
+            'main_symptom': (cd.get('main_symptom') or '').strip(),
+            'status': (cd.get('status') or cd.get('severity') or 'desconocida').strip().lower(),
+        },
+    )
+
+    # ── Conversación si hay mensajes ──
+    messages = hist.get('messages') or []
+    conv = None
+    if messages:
+        conv = Conversation.objects.create(
+            user=request.user,
+            context=ctx,
+            title=(
+                hist.get('title')
+                or f'{plant_key or plot_name} — {messages[0].get("created_at", "")[:10]}'
+            ),
+        )
+        for msg in messages:
+            ChatMessage.objects.create(
+                conversation=conv,
+                role=msg.get('role', 'user'),
+                content=msg.get('content', ''),
+                image_type='',
+                image_path='',
+            )
+        resultados['sesiones'] += 1
+
+    # ── AnalysisResult (alimenta el Historial) ──
+    analysis = None
+    if hist.get('disease_name_predicted') or hist.get('severity') or hist.get('image_url'):
+        confidence_percent = hist.get('confidence_percent') or 0
+        analysis = AnalysisResult.objects.create(
+            user=request.user,
+            conversation=conv,
+            disease_name_predicted=(hist.get('disease_name_predicted') or hist.get('final_diagnosis') or ''),
+            confidence=float(confidence_percent) / 100.0,
+            probability=float(hist.get('probability') or 0.0),
+            severity=(hist.get('severity') or cd.get('status') or 'desconocida'),
+            analysis_text=(hist.get('analysis_text') or hist.get('notes') or ''),
+            recommendations_text=(hist.get('recommendations_text') or hist.get('treatment_applied') or ''),
+            latitude=hist.get('latitude'),
+            longitude=hist.get('longitude'),
+        )
+        if hist.get('created_at'):
+            AnalysisResult.objects.filter(pk=analysis.pk).update(created_at=hist['created_at'])
+
+        image_url = hist.get('image_url')
+        if image_url:
+            try:
+                content, filename = _fetch_image_content(image_url, request)
+                if content:
+                    analysis.image_path.save(filename, ContentFile(content), save=True)
+                    resultados['imagenes'] += 1
+                else:
+                    resultados['errores'].append(f'#{idx}: imagen no encontrada en el origen')
+            except Exception as e:
+                logger.exception('Error descargando imagen del historial #%d', idx)
+                resultados['errores'].append(f'#{idx}: no se pudo descargar la imagen ({e})')
+
+    # ── PlantHistory ──
+    ph = PlantHistory.objects.create(
+        context=ctx,
+        analysis_result=analysis,
+        final_diagnosis=(hist.get('final_diagnosis') or hist.get('disease_name_predicted') or ''),
+        treatment_applied=(hist.get('treatment_applied') or hist.get('recommendations_text') or ''),
+        notes=(hist.get('notes') or hist.get('analysis_text') or ''),
+    )
+    if hist.get('created_at'):
+        PlantHistory.objects.filter(pk=ph.pk).update(created_at=hist['created_at'])
+    resultados['historiales'] += 1
+
+
 class ImportBackupView(APIView):
     """
     Importa un respaldo completo de plant histories, sesiones, análisis (con imagen) y settings.
@@ -469,13 +586,13 @@ class ImportBackupView(APIView):
         resultados = {'settings': False, 'sesiones': 0, 'historiales': 0, 'imagenes': 0, 'saltados': 0, 'errores': []}
 
         # ─── 1. Settings ───
-        settings = data.get('pitahayaVision.settings.v1')
-        if settings and isinstance(settings, dict):
+        settings_data = data.get('pitahayaVision.settings.v1')
+        if settings_data and isinstance(settings_data, dict):
             try:
                 profile, _ = Profile.objects.get_or_create(user=request.user)
                 for field in ('notifications_enabled', 'notify_severity_threshold'):
-                    if field in settings:
-                        setattr(profile, field, settings[field])
+                    if field in settings_data:
+                        setattr(profile, field, settings_data[field])
                 profile.save()
                 resultados['settings'] = True
             except Exception as e:
@@ -488,108 +605,7 @@ class ImportBackupView(APIView):
 
         for idx, hist in enumerate(historiales):
             try:
-                cd = hist.get('context_detail') or {}
-                farm_name = (cd.get('farm_name') or cd.get('lotId') or '').strip()
-                plot_name = (cd.get('plot_name') or '').strip()
-                location = (cd.get('location') or '').strip()
-
-                if not farm_name or not plot_name:
-                    resultados['saltados'] += 1
-                    continue
-
-                farm, _ = Farm.objects.get_or_create(
-                    user=request.user,
-                    name=farm_name,
-                    defaults={'location': location},
-                )
-
-                plot, _ = Plot.objects.get_or_create(
-                    farm=farm,
-                    name=plot_name,
-                    defaults={
-                        'zone': (cd.get('zone') or '').strip(),
-                        'rows': str(cd.get('rows') or ''),
-                        'hectares': 0.0,
-                    },
-                )
-
-                plant_key = (cd.get('plant_key_or_id') or '').strip()
-                ctx, _ = Context.objects.get_or_create(
-                    plot=plot,
-                    plant_key_or_id=plant_key,
-                    defaults={
-                        'affected_part': (cd.get('affected_part') or '').strip(),
-                        'main_symptom': (cd.get('main_symptom') or '').strip(),
-                        'status': (cd.get('status') or cd.get('severity') or 'desconocida').strip().lower(),
-                    },
-                )
-
-                # ── Conversación si hay mensajes ──
-                messages = hist.get('messages') or []
-                conv = None
-                if messages:
-                    conv = Conversation.objects.create(
-                        user=request.user,
-                        context=ctx,
-                        title=(
-                            hist.get('title')
-                            or f'{plant_key or plot_name} — {messages[0].get("created_at", "")[:10]}'
-                        ),
-                    )
-                    for msg in messages:
-                        ChatMessage.objects.create(
-                            conversation=conv,
-                            role=msg.get('role', 'user'),
-                            content=msg.get('content', ''),
-                            image_type='',
-                            image_path='',
-                        )
-                    resultados['sesiones'] += 1
-
-                # ── AnalysisResult (alimenta el Historial) ──
-                analysis = None
-                if hist.get('disease_name_predicted') or hist.get('severity') or hist.get('image_url'):
-                    confidence_percent = hist.get('confidence_percent') or 0
-                    analysis = AnalysisResult.objects.create(
-                        user=request.user,
-                        conversation=conv,
-                        disease_name_predicted=(hist.get('disease_name_predicted') or hist.get('final_diagnosis') or ''),
-                        confidence=float(confidence_percent) / 100.0,
-                        probability=float(hist.get('probability') or 0.0),
-                        severity=(hist.get('severity') or cd.get('status') or 'desconocida'),
-                        analysis_text=(hist.get('analysis_text') or hist.get('notes') or ''),
-                        recommendations_text=(hist.get('recommendations_text') or hist.get('treatment_applied') or ''),
-                        latitude=hist.get('latitude'),
-                        longitude=hist.get('longitude'),
-                    )
-                    if hist.get('created_at'):
-                        AnalysisResult.objects.filter(pk=analysis.pk).update(created_at=hist['created_at'])
-
-                    image_url = hist.get('image_url')
-                    if image_url:
-                        try:
-                            content, filename = _fetch_image_content(image_url, request)
-                            if content:
-                                analysis.image_path.save(filename, ContentFile(content), save=True)
-                                resultados['imagenes'] += 1
-                            else:
-                                resultados['errores'].append(f'#{idx}: imagen no encontrada en el origen')
-                        except Exception as e:
-                            logger.exception('Error descargando imagen del historial #%d', idx)
-                            resultados['errores'].append(f'#{idx}: no se pudo descargar la imagen ({e})')
-
-                # ── PlantHistory ──
-                ph = PlantHistory.objects.create(
-                    context=ctx,
-                    analysis_result=analysis,
-                    final_diagnosis=(hist.get('final_diagnosis') or hist.get('disease_name_predicted') or ''),
-                    treatment_applied=(hist.get('treatment_applied') or hist.get('recommendations_text') or ''),
-                    notes=(hist.get('notes') or hist.get('analysis_text') or ''),
-                )
-                if hist.get('created_at'):
-                    PlantHistory.objects.filter(pk=ph.pk).update(created_at=hist['created_at'])
-                resultados['historiales'] += 1
-
+                _import_plant_history_record(request, hist, idx, resultados)
             except Exception as e:
                 logger.exception('Error en historial #%d', idx)
                 resultados['errores'].append(
@@ -672,7 +688,14 @@ class HeatmapAnalysisView(APIView):
             f'DATOS DEL MAPA DE CALOR:\n{summary}'
         )
 
-        analysis = chatbot_client.chat(message=prompt, context='', max_length=600)
+        try:
+            analysis = chatbot_client.chat(message=prompt, context='', max_length=600)
+        except Exception:
+            logger.exception('Error generando el análisis del mapa de calor')
+            return Response(
+                {'error': 'No se pudo generar el análisis en este momento.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         return Response({'analysis': analysis})
 
 

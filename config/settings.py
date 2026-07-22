@@ -153,7 +153,6 @@ REST_FRAMEWORK = {
         'password_reset': '10/hour',
         'email_verification': '10/minute',
         'availability': '60/minute',
-        'authenticated_user': '3000/hour',
     },
 }
 
@@ -161,7 +160,7 @@ REST_FRAMEWORK = {
 ANALYSIS_SERVICE_URL = os.getenv('ANALYSIS_SERVICE_URL', 'http://localhost:8001')
 ANALYSIS_SERVICE_TIMEOUT = int(os.getenv('ANALYSIS_SERVICE_TIMEOUT', '60'))
 VISUAL_CROSSING_API_KEY = os.getenv('VISUAL_CROSSING_API_KEY', '')
-CHATBOT_SERVICE_URL = os.getenv('CHATBOT_SERVICE_URL', '')
+CHATBOT_SERVICE_URL = os.getenv('CHATBOT_SERVICE_URL', 'http://localhost:8002')
 CHATBOT_SERVICE_TIMEOUT = int(os.getenv('CHATBOT_SERVICE_TIMEOUT', '120'))
 
 # --- CORS ---
@@ -225,3 +224,25 @@ if 'smtp' in EMAIL_BACKEND:
     EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
     EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('1', 'true', 'yes')
     EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
+
+# --- Logging ---
+# Sin esto, los logger.info/warning/exception de apps/* (clients de los
+# microservicios, RAG, importación de backups, etc.) no van a ningún lado:
+# caen al logger raíz de Python, que no tiene handler configurado.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'simple'},
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO' if DEBUG else 'WARNING',
+    },
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+    },
+}

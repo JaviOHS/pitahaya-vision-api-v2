@@ -12,10 +12,6 @@ TIMEOUT = getattr(settings, 'CHATBOT_SERVICE_TIMEOUT', 120)
 _NGROK_HEADERS = {'ngrok-skip-browser-warning': 'true'}
 
 
-class ChatbotClientError(Exception):
-    pass
-
-
 def chat(message: str, context: str = '', max_length: int = 384) -> str:
     if not SERVICE_URL:
         logger.warning('CHATBOT_SERVICE_URL no configurada en settings')

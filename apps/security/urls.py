@@ -7,6 +7,7 @@ from .views import (
     CustomerViewSet,
     CustomLoginView,
     CustomRegisterView,
+    CustomPasswordResetView,
     delete_account_view,
     request_verification_email,
     confirm_verification_email,
@@ -18,6 +19,7 @@ router.register(r'customers', CustomerViewSet)
 
 urlpatterns = [
     path('login/', CustomLoginView.as_view(), name='rest_login'),
+    path('password/reset/', CustomPasswordResetView.as_view(), name='rest_password_reset'),
     path('', include('dj_rest_auth.urls')),
     path('registration/', CustomRegisterView.as_view(), name='rest_register'),
     path('registration/', include('dj_rest_auth.registration.urls')),

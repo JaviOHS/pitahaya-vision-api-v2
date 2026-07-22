@@ -1,5 +1,5 @@
 from django.conf import settings
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle
 
 
 class LoginRateThrottle(AnonRateThrottle):
@@ -23,7 +23,3 @@ class EmailVerificationRateThrottle(AnonRateThrottle):
 
 class AvailabilityRateThrottle(AnonRateThrottle):
     scope = 'availability'
-
-
-class AuthenticatedUserThrottle(UserRateThrottle):
-    scope = 'authenticated_user'

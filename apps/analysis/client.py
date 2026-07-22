@@ -13,10 +13,6 @@ MAX_RETRIES = 3
 BASE_BACKOFF = 1.0
 
 
-class AnalysisClientError(Exception):
-    pass
-
-
 def _build_fallback(message: str = '') -> dict:
     return {
         'status': 'enferma',

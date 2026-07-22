@@ -56,7 +56,10 @@ class RagSearchView(APIView):
 
     def post(self, request):
         query = request.data.get('query', '').strip()
-        top_k = int(request.data.get('top_k', 4))
+        try:
+            top_k = int(request.data.get('top_k', 4))
+        except (TypeError, ValueError):
+            top_k = 4
 
         if not query:
             return Response(
