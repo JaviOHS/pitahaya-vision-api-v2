@@ -410,7 +410,13 @@ class ExportBackupView(APIView):
         messages = []
         if conv:
             messages = [
-                {'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()}
+                {
+                    'role': m.role,
+                    'content': m.content,
+                    'image_type': m.image_type,
+                    'image_path': m.image_path,
+                    'created_at': m.created_at.isoformat(),
+                }
                 for m in sorted(conv.messages.all(), key=lambda m: m.created_at)
             ]
 
@@ -527,8 +533,8 @@ def _import_plant_history_record(request, hist, idx, resultados):
                 conversation=conv,
                 role=msg.get('role', 'user'),
                 content=msg.get('content', ''),
-                image_type='',
-                image_path='',
+                image_type=msg.get('image_type', ''),
+                image_path=msg.get('image_path', ''),
             )
         resultados['sesiones'] += 1
 
