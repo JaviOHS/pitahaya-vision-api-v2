@@ -5,4 +5,4 @@ class AnalysisConfig(AppConfig):
     name = 'apps.analysis'
 
     def ready(self):
-        import apps.analysis  # noqa
+        import apps.analysis

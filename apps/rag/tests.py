@@ -22,9 +22,6 @@ def _results(response):
     return []
 
 
-# =============================================================================
-# MODEL TESTS
-# =============================================================================
 
 class RagDocumentModelTests(TestCase):
     def test_crear_documento(self):
@@ -84,9 +81,6 @@ class RagChunkModelTests(TestCase):
         self.assertEqual(self.doc.chunks.count(), 2)
 
 
-# =============================================================================
-# SERIALIZER TESTS
-# =============================================================================
 
 class RagSerializersTests(TestCase):
     def test_rag_chunk_serializer(self):
@@ -115,9 +109,6 @@ class RagSerializersTests(TestCase):
         self.assertEqual(serializer.data['title'], 'Doc Test')
 
 
-# =============================================================================
-# VIEW TESTS
-# =============================================================================
 
 class RagViewsBase(TestCase):
     def setUp(self):
@@ -229,9 +220,6 @@ class RagSearchViewTests(RagViewsBase):
         self.assertEqual(response.status_code, 401)
 
 
-# =============================================================================
-# LOADER TESTS
-# =============================================================================
 
 class LoaderTests(TestCase):
     def test_load_markdown(self):
@@ -304,9 +292,6 @@ class LoaderTests(TestCase):
         self.assertGreaterEqual(len(sentences), 3)
 
 
-# =============================================================================
-# EMBEDDER TESTS
-# =============================================================================
 
 class EmbedderTests(TestCase):
     def setUp(self):
@@ -348,9 +333,6 @@ class EmbedderTests(TestCase):
         self.assertEqual(len(result), 3)
 
 
-# =============================================================================
-# RETRIEVER TESTS
-# =============================================================================
 
 class RetrieverTests(TestCase):
     def setUp(self):

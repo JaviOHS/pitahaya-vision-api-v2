@@ -9,10 +9,9 @@ import re
 
 logger = logging.getLogger(__name__)
 
-# Parámetros de chunking
-CHUNK_SIZE = 400      # palabras máximas por chunk
-CHUNK_OVERLAP = 60    # palabras de superposición entre chunks
-MIN_CHUNK_WORDS = 30  # descarta chunks muy cortos (encabezados, etc.)
+CHUNK_SIZE = 400
+CHUNK_OVERLAP = 60
+MIN_CHUNK_WORDS = 30
 
 
 def file_hash(path: str) -> str:
@@ -68,7 +67,6 @@ def load_document(path: str) -> list[dict]:
         return load_pdf(path)
     if lower.endswith(('.md', '.txt')):
         return load_markdown(path)
-    # Intenta PDF por defecto
     return load_pdf(path)
 
 
@@ -77,7 +75,6 @@ def chunk_pages(pages: list[dict]) -> list[dict]:
     Divide las páginas en chunks con superposición.
     Retorna lista de {text, page, chunk_index}.
     """
-    # Unir el texto de todas las páginas conservando metadato de página
     page_segments = []
     for page_data in pages:
         sentences = _split_sentences(page_data['text'])
@@ -96,7 +93,6 @@ def chunk_pages(pages: list[dict]) -> list[dict]:
     for seg in page_segments:
         words = seg['sentence'].split()
         if current_words and len(current_words) + len(words) > CHUNK_SIZE:
-            # Guardar chunk actual
             chunk_text = ' '.join(current_words)
             if len(current_words) >= MIN_CHUNK_WORDS:
                 chunks.append({
@@ -105,14 +101,12 @@ def chunk_pages(pages: list[dict]) -> list[dict]:
                     'chunk_index': chunk_idx,
                 })
                 chunk_idx += 1
-            # Iniciar siguiente chunk con overlap
             overlap_start = max(0, len(current_words) - CHUNK_OVERLAP)
             current_words = current_words[overlap_start:] + words
         else:
             current_words.extend(words)
         current_page = seg['page']
 
-    # Último chunk
     if len(current_words) >= MIN_CHUNK_WORDS:
         chunks.append({
             'text': ' '.join(current_words),
@@ -126,17 +120,13 @@ def chunk_pages(pages: list[dict]) -> list[dict]:
 
 def _split_sentences(text: str) -> list[str]:
     """Divide texto en oraciones usando puntuación."""
-    # Divide en oraciones pero agrupa líneas cortas (encabezados) con la siguiente
     parts = re.split(r'(?<=[.!?:])\s+|\n{2,}', text)
     return [p.strip() for p in parts if p.strip()]
 
 
 def _clean_text(text: str) -> str:
     """Limpia artefactos comunes de extracción de PDF."""
-    # Elimina caracteres de control excepto saltos de línea
     text = re.sub(r'[^\x20-\x7E\xA0-\xFF\n]', ' ', text)
-    # Colapsa espacios múltiples
     text = re.sub(r'[ \t]{2,}', ' ', text)
-    # Normaliza saltos de línea múltiples
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()

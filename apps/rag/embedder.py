@@ -11,8 +11,6 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Modelo multilingüe ligero (~420 MB, 384 dimensiones).
-# Soporta español de forma nativa — ideal para documentos agrícolas.
 EMBEDDING_MODEL = 'paraphrase-multilingual-MiniLM-L12-v2'
 
 
@@ -41,7 +39,7 @@ def embed_texts(texts: list[str]) -> np.ndarray | None:
     try:
         vectors = model.encode(
             texts,
-            normalize_embeddings=True,   # para cosine similarity con dot product
+            normalize_embeddings=True,
             show_progress_bar=len(texts) > 10,
             batch_size=32,
         )

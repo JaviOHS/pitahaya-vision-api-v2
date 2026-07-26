@@ -1,12 +1,6 @@
 from apps.security.utils import notifications_enabled_for, send_notification_email
 from apps.security.permissions import get_admin_users
 
-# El clasificador actual solo distingue 'sana' / 'enferma' (ver
-# apps/analysis/client.py), sin niveles de severidad graduados. Mientras
-# tanto, 'enferma' se trata como severidad "alta" para el filtro de correo,
-# de forma que el umbral del usuario siga siendo útil. Si el modelo llega a
-# entregar niveles más finos (leve/moderada/alta/critica), este mapa ya los
-# soporta sin más cambios.
 SEVERITY_RANK = {
     'ninguna': 0, 'sana': 0, 'saludable': 0,
     'baja': 1, 'leve': 1,
@@ -17,9 +11,6 @@ SEVERITY_RANK = {
 
 THRESHOLD_RANK = {'baja': 1, 'moderada': 2, 'alta': 3, 'critica': 4}
 
-# Solo se alerta a los administradores cuando un análisis (de cualquier
-# usuario) llega a este rango o más (equivale a 'alta'/'critica'/'enferma').
-# Por debajo de esto sería demasiado ruido para un correo "de vigilancia".
 ADMIN_ALERT_MIN_RANK = THRESHOLD_RANK['alta']
 
 
@@ -114,7 +105,7 @@ def notify_admins_of_critical_analysis(instance):
 
     for admin in get_admin_users():
         if user and admin.pk == user.pk:
-            continue  # ya recibió su propio correo de "Nuevo análisis completado"
+            continue
         if not notifications_enabled_for(admin):
             continue
         profile = getattr(admin, 'profile', None)

@@ -101,14 +101,12 @@ class Command(BaseCommand):
         doc.chunks_count = 0
         doc.save()
 
-        # 1. Cargar y limpiar el documento
         self.stdout.write('  Cargando documento...')
         pages = load_document(abs_path)
         if not pages:
             self.stdout.write(self.style.ERROR('  No se pudo extraer texto del documento.'))
             return 0
 
-        # 2. Dividir en chunks
         self.stdout.write('  Dividiendo en chunks...')
         chunks = chunk_pages(pages)
         if not chunks:
@@ -116,7 +114,6 @@ class Command(BaseCommand):
             return 0
         self.stdout.write(f'  {len(chunks)} chunks generados.')
 
-        # 3. Generar embeddings
         self.stdout.write(f'  Generando embeddings con {EMBEDDING_MODEL}...')
         t0 = time.time()
         texts = [c['text'] for c in chunks]
@@ -131,7 +128,6 @@ class Command(BaseCommand):
         elapsed = time.time() - t0
         self.stdout.write(f'  Embeddings generados en {elapsed:.1f}s')
 
-        # 4. Guardar en DB
         self.stdout.write('  Guardando en base de datos...')
         chunk_objects = [
             RagChunk(

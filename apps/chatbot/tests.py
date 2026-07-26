@@ -27,9 +27,6 @@ def _results(response):
     return []
 
 
-# =============================================================================
-# MODEL TESTS
-# =============================================================================
 
 class FarmModelTests(TestCase):
     def setUp(self):
@@ -146,9 +143,6 @@ class PlantHistoryModelTests(TestCase):
         self.assertEqual(ph.analysis_result, analysis)
 
 
-# =============================================================================
-# VIEW TESTS
-# =============================================================================
 
 class ChatbotViewsBase(TestCase):
     def setUp(self):
@@ -629,9 +623,6 @@ class ChatbotClientTests(TestCase):
             self.assertEqual(health()['status'], 'not_configured')
 
 
-# =============================================================================
-# SERIALIZER TESTS
-# =============================================================================
 
 class PlantHistorySerializerTests(ChatbotViewsBase):
     def setUp(self):

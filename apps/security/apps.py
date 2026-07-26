@@ -5,4 +5,4 @@ class SecurityConfig(AppConfig):
     name = 'apps.security'
 
     def ready(self):
-        import apps.security.signals  # noqa
+        import apps.security.signals

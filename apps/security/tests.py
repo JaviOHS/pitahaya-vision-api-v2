@@ -359,8 +359,6 @@ class CheckAvailabilityTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_availability_no_autenticado(self):
-        # Debe ser accesible sin autenticación: se usa en el formulario público
-        # de registro, antes de que exista una sesión.
         self.client.force_authenticate(user=None)
         response = self.client.get('/api/v2/auth/availability/',
                                     {'field': 'username', 'value': 'test'})

@@ -20,7 +20,6 @@ def custom_exception_handler(exc, context):
         if wait:
             response.data['wait'] = wait
 
-    # Normalizar wait cuando DRF lo envuelve en arrays
     if response is not None and isinstance(response.data, dict):
         wait = response.data.get('wait')
         if isinstance(wait, list) and len(wait):

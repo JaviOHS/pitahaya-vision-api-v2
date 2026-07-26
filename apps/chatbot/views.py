@@ -34,10 +34,8 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
-# Número de chunks RAG a inyectar en el contexto del modelo
 RAG_TOP_K = 4
 
-# Palabras que indican una consulta general (no específica de un análisis)
 _GENERAL_QUERY_TOKENS = frozenset({
     'general', 'todos', 'todo', 'historial', 'historial completo',
     'resumen general', 'todos los analisis', 'todos los análisis',
@@ -51,7 +49,6 @@ _GENERAL_QUERY_TOKENS = frozenset({
 def _is_general_query(message: str, farm_context: str) -> bool:
     """ Detecta si el mensaje pide info general SIN contexto específico. """
     msg_lower = message.lower().strip()
-    # Si hay contexto agrícola con datos concretos, la consulta es específica
     if farm_context and any(kw in farm_context.lower() for kw in ('síntoma', 'sintoma', 'parte afectada', 'diagnóstico', 'diagnostico', 'planta')):
         return False
     for token in _GENERAL_QUERY_TOKENS:
@@ -162,17 +159,13 @@ class AskChatbotView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 1. Contexto agrícola desde la conversación guardada en DB
         farm_context = self._build_farm_context(conversation_id, request.user)
 
-        # 1.5. Consulta general sin contexto específico → redirigir a Historial
         if _is_general_query(message, farm_context):
             return Response({'response': _GENERAL_QUERY_RESPONSE})
 
-        # 2. Contexto RAG (omitido cuando no_rag=True, p.ej. comparaciones)
         rag_context = '' if no_rag else _build_rag_context(message)
 
-        # 3. Combinar contextos en un único bloque coherente para Gemma
         full_context = _merge_contexts(farm_context, rag_context)
 
         logger.info(
@@ -182,7 +175,6 @@ class AskChatbotView(APIView):
             bool(farm_context),
         )
 
-        # 4. Llamar al microservicio Gemma (ngrok / Colab)
         ai_response = chatbot_client.chat(
             message=message,
             context=full_context,
@@ -191,9 +183,6 @@ class AskChatbotView(APIView):
 
         return Response({'response': ai_response})
 
-    # ------------------------------------------------------------------
-    # Helpers privados
-    # ------------------------------------------------------------------
 
     def _parse_chat_request(self, request, default_max_length):
         """Extrae y normaliza los campos comunes del body de /chat y /chat/stream."""
@@ -317,8 +306,8 @@ def _parse_suggestions(raw: str) -> list[str]:
     lines = [l.strip() for l in raw.strip().splitlines() if l.strip()]
     cleaned = []
     for line in lines:
-        line = re.sub(r'^[\d]+[.)]\s*', '', line)   # quitar "1. "
-        line = re.sub(r'^[-*•]\s*', '', line)         # quitar "- "
+        line = re.sub(r'^[\d]+[.)]\s*', '', line)
+        line = re.sub(r'^[-*•]\s*', '', line)
         line = line.strip('"\'')
         if line and len(line) > 8:
             cleaned.append(line)
@@ -466,7 +455,7 @@ def _fetch_image_content(image_url, request):
     media_root = os.path.abspath(str(settings.MEDIA_ROOT))
     abs_path = os.path.abspath(os.path.join(media_root, rel_path))
     if abs_path != media_root and not abs_path.startswith(media_root + os.sep):
-        return None, None  # fuera de MEDIA_ROOT — intento de path traversal
+        return None, None
     if not os.path.isfile(abs_path):
         return None, None
 
@@ -483,11 +472,6 @@ def _import_plant_history_record(request, hist, idx, resultados):
     huérfanas (los registros ya importados antes de este no se ven afectados).
     """
     cd = hist.get('context_detail') or {}
-    # Farm/Plot/Context normalizan el nombre en su save() (capitalizan cada
-    # palabra, incluidos conectores como "del"/"de"/"la"). Si no se normaliza
-    # aquí también, el get_or_create busca con el texto crudo del backup y
-    # nunca encuentra la fila ya normalizada de una importación anterior,
-    # creando una finca/parcela/contexto duplicado por cada registro.
     farm_name = normalize_name((cd.get('farm_name') or cd.get('lotId') or '').strip())
     plot_name = normalize_name((cd.get('plot_name') or '').strip())
     location = (cd.get('location') or '').strip()
@@ -524,7 +508,6 @@ def _import_plant_history_record(request, hist, idx, resultados):
         },
     )
 
-    # ── Conversación si hay mensajes ──
     messages = hist.get('messages') or []
     conv = None
     if messages:
@@ -546,7 +529,6 @@ def _import_plant_history_record(request, hist, idx, resultados):
             )
         resultados['sesiones'] += 1
 
-    # ── AnalysisResult (alimenta el Historial) ──
     analysis = None
     if hist.get('disease_name_predicted') or hist.get('severity') or hist.get('image_url'):
         confidence_percent = hist.get('confidence_percent') or 0
@@ -570,9 +552,6 @@ def _import_plant_history_record(request, hist, idx, resultados):
             try:
                 content, filename = _fetch_image_content(image_url, request)
                 if content:
-                    # save=False: guardar la instancia completa aquí revertiría
-                    # el created_at ya corregido arriba, porque `analysis` en
-                    # memoria todavía tiene el valor original de auto_now_add.
                     analysis.image_path.save(filename, ContentFile(content), save=False)
                     analysis.save(update_fields=['image_path'])
                     resultados['imagenes'] += 1
@@ -582,7 +561,6 @@ def _import_plant_history_record(request, hist, idx, resultados):
                 logger.exception('Error descargando imagen del historial #%d', idx)
                 resultados['errores'].append(f'#{idx}: no se pudo descargar la imagen ({e})')
 
-    # ── PlantHistory ──
     ph = PlantHistory.objects.create(
         context=ctx,
         analysis_result=analysis,
@@ -611,7 +589,6 @@ class ImportBackupView(APIView):
 
         resultados = {'settings': False, 'sesiones': 0, 'historiales': 0, 'imagenes': 0, 'saltados': 0, 'errores': []}
 
-        # ─── 1. Settings ───
         settings_data = data.get('pitahayaVision.settings.v1')
         if settings_data and isinstance(settings_data, dict):
             try:
@@ -625,7 +602,6 @@ class ImportBackupView(APIView):
                 logger.exception('Error importando settings')
                 resultados['errores'].append(f'Settings: {e}')
 
-        # ─── 2. Historiales de planta ───
         historiales = data.get('pitahayaVision.plantHistory.v1', [])
         logger.info('Importando %d historiales de planta…', len(historiales))
 

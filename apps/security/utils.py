@@ -34,7 +34,7 @@ def normalize_name(value: str) -> str:
     return ' '.join(w.capitalize() for w in value.split())
 
 
-EMAIL_VERIFICATION_TIMEOUT = 86400  # 1 día en segundos
+EMAIL_VERIFICATION_TIMEOUT = 86400
 
 
 class EmailVerificationTokenGenerator(PasswordResetTokenGenerator):
@@ -68,10 +68,6 @@ def validate_ecuadorian_dni(value):
     if province < 1 or province > 24:
         raise serializers.ValidationError('Cédula inválida: provincia no reconocida.')
 
-    # Nota: la restricción de "tercer dígito menor a 6" no es una regla oficial
-    # del Registro Civil (no consta en ningún instructivo, reglamento o ley);
-    # el único mecanismo de validación formalmente aceptado es el dígito
-    # verificador (algoritmo Módulo 10) calculado a continuación.
     coefficients = [2, 1, 2, 1, 2, 1, 2, 1, 2]
     total = 0
     for i in range(9):

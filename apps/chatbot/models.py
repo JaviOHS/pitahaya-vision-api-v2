@@ -83,7 +83,7 @@ class Conversation(models.Model):
     
 class ChatMessage(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
-    role = models.CharField(max_length=20, default='user')  # 'user' o 'assistant'
+    role = models.CharField(max_length=20, default='user')
     content = models.TextField(blank=True, default='')
     image_type = models.CharField(max_length=100, default='', blank=True)
     image_path = models.CharField(max_length=500, default='', blank=True)

@@ -114,7 +114,6 @@ class AnalysisListCreateView(OwnerFilterMixin, generics.ListCreateAPIView):
         except Exception as exc:
             logger.exception('Error al clasificar imagen: %s', exc)
 
-        # ── Create PlantHistory if a conversation is linked ──
         if instance.conversation and instance.conversation.context:
             try:
                 PlantHistory.objects.create(

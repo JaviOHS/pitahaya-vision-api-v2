@@ -5,6 +5,7 @@ from unittest.mock import ANY, MagicMock, patch
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework import serializers
@@ -258,6 +259,7 @@ class AnalysisViewsTests(TestCase):
 
 class WeatherProxyViewTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.user = User.objects.create_user(
             username='weather_test', password='Pass1234!',
         )
@@ -269,7 +271,7 @@ class WeatherProxyViewTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 400)
 
-    @override_settings(VISUAL_CROSSING_API_KEY='')
+    @override_settings(VISUAL_CROSSING_API_KEY='', VISUAL_CROSSING_API_KEY_BACKUP='')
     def test_weather_sin_api_key(self):
         response = self.client.get(self.url, {'lat': '-0.2', 'lon': '-78.5'})
         self.assertEqual(response.status_code, 503)

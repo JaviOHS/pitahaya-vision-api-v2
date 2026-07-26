@@ -76,7 +76,6 @@ WSGI_APPLICATION = 'config.wsgi.application'
 AUTH_USER_MODEL = 'security.User'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# --- Database (PostgreSQL o SQLite según DB_ENGINE) ---
 DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite')
 if DB_ENGINE == 'postgresql':
     os.environ.setdefault('PGCLIENTENCODING', 'UTF8')
@@ -118,15 +117,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# --- Token expiry (hours) ---
-TOKEN_EXPIRY_HOURS = int(os.getenv('TOKEN_EXPIRY_HOURS', '168'))  # 7 días por defecto
+TOKEN_EXPIRY_HOURS = int(os.getenv('TOKEN_EXPIRY_HOURS', '168'))
 
-# --- Account lockout ---
 MAX_LOGIN_ATTEMPTS = int(os.getenv('MAX_LOGIN_ATTEMPTS', '5'))
 LOGIN_LOCKOUT_MINUTES = int(os.getenv('LOGIN_LOCKOUT_MINUTES', '15'))
 LOGIN_THROTTLE_RATE = os.getenv('LOGIN_THROTTLE_RATE', '3/minute')
 
-# --- DRF ---
 REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'apps.security.exceptions.custom_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -156,7 +152,6 @@ REST_FRAMEWORK = {
     },
 }
 
-# --- External microservices ---
 ANALYSIS_SERVICE_URL = os.getenv('ANALYSIS_SERVICE_URL', 'http://localhost:8001')
 ANALYSIS_SERVICE_TIMEOUT = int(os.getenv('ANALYSIS_SERVICE_TIMEOUT', '60'))
 VISUAL_CROSSING_API_KEY = os.getenv('VISUAL_CROSSING_API_KEY', '')
@@ -164,12 +159,10 @@ VISUAL_CROSSING_API_KEY_BACKUP = os.getenv('VISUAL_CROSSING_API_KEY_BACKUP', '')
 CHATBOT_SERVICE_URL = os.getenv('CHATBOT_SERVICE_URL', 'http://localhost:8002')
 CHATBOT_SERVICE_TIMEOUT = int(os.getenv('CHATBOT_SERVICE_TIMEOUT', '120'))
 
-# --- CORS ---
 cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins.split(',')]
 CORS_ALLOW_CREDENTIALS = True
 
-# --- django-allauth / dj-rest-auth ---
 SITE_ID = 1
 ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'mandatory')
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = int(os.getenv('ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS', '1'))
@@ -191,22 +184,13 @@ REST_AUTH = {
     'USE_JWT': False,
 }
 
-# --- Email ---
-# Backend usado para enviar correos. Dos opciones:
-#   - console (default en desarrollo): imprime los correos en la terminal
-#     donde corre `runserver`. Útil para pruebas sin SMTP.
-#   - smtp: envía correos reales vía SMTP (Gmail, etc.).
-# Se configura en .env con EMAIL_BACKEND. Si no está definido, se
-# elige automáticamente: console en desarrollo, smtp en producción.
 EMAIL_BACKEND = os.getenv(
     'EMAIL_BACKEND',
     'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend'
 )
 
-# Dirección que aparece como remitente en los correos
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@pitahaya-vision.local')
 
-# URLs del frontend usadas en los enlaces de los correos
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 EMAIL_VERIFICATION_FRONTEND_URL = os.getenv(
     'EMAIL_VERIFICATION_FRONTEND_URL',
@@ -217,7 +201,6 @@ PASSWORD_RESET_FRONTEND_URL = os.getenv(
     'http://localhost:5173/recuperar-cuenta/confirmar'
 )
 
-# Configuración SMTP — solo aplica cuando el backend es smtp
 if 'smtp' in EMAIL_BACKEND:
     EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
     EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
@@ -226,10 +209,6 @@ if 'smtp' in EMAIL_BACKEND:
     EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('1', 'true', 'yes')
     EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
 
-# --- Logging ---
-# Sin esto, los logger.info/warning/exception de apps/* (clients de los
-# microservicios, RAG, importación de backups, etc.) no van a ningún lado:
-# caen al logger raíz de Python, que no tiene handler configurado.
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

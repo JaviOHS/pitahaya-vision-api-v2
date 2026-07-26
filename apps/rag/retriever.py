@@ -13,7 +13,6 @@ from .models import RagChunk
 
 logger = logging.getLogger(__name__)
 
-# Umbral mínimo de similitud para incluir un chunk en el contexto
 SIMILARITY_THRESHOLD = 0.25
 
 

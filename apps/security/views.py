@@ -161,9 +161,6 @@ class CustomerViewSet(ModelViewSet):
     serializer_class = UserSummarySerializer
 
     def create(self, request, *args, **kwargs):
-        # Las cuentas se crean únicamente vía registro público (con contraseña
-        # y verificación de correo); este endpoint es solo para gestionar
-        # cuentas existentes (listar, activar/desactivar, cambiar rol).
         return Response({'detail': 'Método no permitido.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     @action(detail=True, methods=['post'])
