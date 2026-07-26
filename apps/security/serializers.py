@@ -221,7 +221,7 @@ class UserSummarySerializer(UserFieldMixin, serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'phone', 'dni', 'is_active', 'full_name',
-            'profile_photo_url', 'role', 'role_label', 'date_joined',
+            'profile_photo_url', 'role', 'role_label', 'date_joined', 'deactivated_at',
         ]
 
 

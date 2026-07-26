@@ -139,7 +139,7 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'apps.security.pagination.DefaultPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -160,6 +160,7 @@ REST_FRAMEWORK = {
 ANALYSIS_SERVICE_URL = os.getenv('ANALYSIS_SERVICE_URL', 'http://localhost:8001')
 ANALYSIS_SERVICE_TIMEOUT = int(os.getenv('ANALYSIS_SERVICE_TIMEOUT', '60'))
 VISUAL_CROSSING_API_KEY = os.getenv('VISUAL_CROSSING_API_KEY', '')
+VISUAL_CROSSING_API_KEY_BACKUP = os.getenv('VISUAL_CROSSING_API_KEY_BACKUP', '')
 CHATBOT_SERVICE_URL = os.getenv('CHATBOT_SERVICE_URL', 'http://localhost:8002')
 CHATBOT_SERVICE_TIMEOUT = int(os.getenv('CHATBOT_SERVICE_TIMEOUT', '120'))
 

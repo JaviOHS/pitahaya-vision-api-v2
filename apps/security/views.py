@@ -173,7 +173,8 @@ class CustomerViewSet(ModelViewSet):
             return Response({'detail': 'No puedes deshabilitar tu propia cuenta.'},
                             status=status.HTTP_400_BAD_REQUEST)
         target.is_active = not target.is_active
-        target.save(update_fields=['is_active'])
+        target.deactivated_at = None if target.is_active else timezone.now()
+        target.save(update_fields=['is_active', 'deactivated_at'])
         if target.is_active:
             send_notification_email(
                 target,

@@ -162,24 +162,32 @@ def weather_proxy(request):
     if cached:
         return Response(cached)
 
-    api_key = settings.VISUAL_CROSSING_API_KEY
-    if not api_key:
+    api_keys = [k for k in (settings.VISUAL_CROSSING_API_KEY, settings.VISUAL_CROSSING_API_KEY_BACKUP) if k]
+    if not api_keys:
         return Response({'error': 'API key no configurada'}, status=503)
 
-    params = urllib.parse.urlencode({
-        'unitGroup': 'metric',
-        'key': api_key,
-        'include': 'days',
-        'elements': 'datetime,precip,humidity,temp,tempmin,tempmax,windspeed',
-        'contentType': 'json',
-    })
-    url = f'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{lat},{lon}/last{days}days?{params}'
+    data = None
+    last_error = None
+    for api_key in api_keys:
+        params = urllib.parse.urlencode({
+            'unitGroup': 'metric',
+            'key': api_key,
+            'include': 'days',
+            'elements': 'datetime,precip,humidity,temp,tempmin,tempmax,windspeed',
+            'contentType': 'json',
+        })
+        url = f'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{lat},{lon}/last{days}days?{params}'
+        try:
+            with urllib.request.urlopen(url, timeout=10) as resp:
+                data = _json.loads(resp.read().decode())
+            break
+        except Exception as e:
+            last_error = e
+            logger.warning('WeatherProxy error con una de las API keys: %s', e)
+            continue
 
-    try:
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            data = _json.loads(resp.read().decode())
-    except Exception as e:
-        logger.warning('WeatherProxy error: %s', e)
+    if data is None:
+        logger.warning('WeatherProxy: todas las API keys fallaron: %s', last_error)
         return Response({'error': 'No se pudo obtener el clima'}, status=502)
 
     days = data.get('days', [])

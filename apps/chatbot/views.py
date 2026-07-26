@@ -19,6 +19,7 @@ from apps.analysis.views import _filter_by_range
 from apps.security.models import Profile
 from apps.security.mixins import CurrentUserCreateMixin, OwnerFilterMixin
 from apps.security.permissions import is_admin
+from apps.security.utils import normalize_name
 
 from . import client as chatbot_client
 from .models import Context, Conversation, ChatMessage, Farm, PlantHistory, Plot
@@ -403,6 +404,7 @@ class ExportBackupView(APIView):
                 'plot_name': plot.name if plot else '',
                 'zone': plot.zone if plot else '',
                 'rows': plot.rows if plot else '',
+                'hectares': plot.hectares if plot else None,
                 'location': plot.gps_location if plot else '',
                 'created_at': ctx.created_at.isoformat() if ctx.created_at else '',
             }
@@ -481,8 +483,13 @@ def _import_plant_history_record(request, hist, idx, resultados):
     huérfanas (los registros ya importados antes de este no se ven afectados).
     """
     cd = hist.get('context_detail') or {}
-    farm_name = (cd.get('farm_name') or cd.get('lotId') or '').strip()
-    plot_name = (cd.get('plot_name') or '').strip()
+    # Farm/Plot/Context normalizan el nombre en su save() (capitalizan cada
+    # palabra, incluidos conectores como "del"/"de"/"la"). Si no se normaliza
+    # aquí también, el get_or_create busca con el texto crudo del backup y
+    # nunca encuentra la fila ya normalizada de una importación anterior,
+    # creando una finca/parcela/contexto duplicado por cada registro.
+    farm_name = normalize_name((cd.get('farm_name') or cd.get('lotId') or '').strip())
+    plot_name = normalize_name((cd.get('plot_name') or '').strip())
     location = (cd.get('location') or '').strip()
 
     if not farm_name or not plot_name:
@@ -501,11 +508,12 @@ def _import_plant_history_record(request, hist, idx, resultados):
         defaults={
             'zone': (cd.get('zone') or '').strip(),
             'rows': str(cd.get('rows') or ''),
-            'hectares': 0.0,
+            'hectares': float(cd.get('hectares') or 0.0),
+            'gps_location': location,
         },
     )
 
-    plant_key = (cd.get('plant_key_or_id') or '').strip()
+    plant_key = normalize_name((cd.get('plant_key_or_id') or '').strip())
     ctx, _ = Context.objects.get_or_create(
         plot=plot,
         plant_key_or_id=plant_key,
@@ -562,7 +570,11 @@ def _import_plant_history_record(request, hist, idx, resultados):
             try:
                 content, filename = _fetch_image_content(image_url, request)
                 if content:
-                    analysis.image_path.save(filename, ContentFile(content), save=True)
+                    # save=False: guardar la instancia completa aquí revertiría
+                    # el created_at ya corregido arriba, porque `analysis` en
+                    # memoria todavía tiene el valor original de auto_now_add.
+                    analysis.image_path.save(filename, ContentFile(content), save=False)
+                    analysis.save(update_fields=['image_path'])
                     resultados['imagenes'] += 1
                 else:
                     resultados['errores'].append(f'#{idx}: imagen no encontrada en el origen')
