@@ -16,8 +16,8 @@ apps/chatbot/llm_models/
 *.bin
 *.safetensors
 llm_models/
-*.md
 media/
+GUIA.md
 # PostgreSQL
 .pgdata/
 pgdata/
