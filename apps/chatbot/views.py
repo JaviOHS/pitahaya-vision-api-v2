@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from apps.analysis.models import AnalysisResult
 from apps.analysis.serializers import AnalysisResultSerializer
+from apps.analysis.services import get_weather_summary
 from apps.analysis.views import _filter_by_range
 from apps.security.models import Profile
 from apps.security.mixins import CurrentUserCreateMixin, OwnerFilterMixin
@@ -226,6 +227,12 @@ class AskChatbotView(APIView):
                     parts.append(f'Superficie: {plot.hectares} ha')
                 if plot.rows:
                     parts.append(f'Filas/Identificador: {plot.rows}')
+                if plot.gps_location:
+                    coords = re.findall(r'-?\d+\.?\d*', plot.gps_location)
+                    if len(coords) >= 2:
+                        weather_text = get_weather_summary(float(coords[0]), float(coords[1]))
+                        if weather_text:
+                            parts.append(weather_text)
 
             if ctx.plant_key_or_id:
                 parts.append(f'Identificador de planta: {ctx.plant_key_or_id}')
